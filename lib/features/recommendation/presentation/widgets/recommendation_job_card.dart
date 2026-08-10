@@ -6,9 +6,20 @@ import 'package:geti_app/shared/theme/app_colors.dart';
 import 'package:geti_app/shared/theme/app_typography.dart';
 
 class RecommendationJobCard extends StatelessWidget {
-  const RecommendationJobCard({required this.job, super.key});
+  const RecommendationJobCard({
+    required this.job,
+    this.isUninterested = false,
+    this.isBookmarked = false,
+    this.onUninterestedTap,
+    this.onBookmarkTap,
+    super.key,
+  });
 
   final RecommendationJob job;
+  final bool isUninterested;
+  final bool isBookmarked;
+  final VoidCallback? onUninterestedTap;
+  final VoidCallback? onBookmarkTap;
 
   @override
   Widget build(BuildContext context) {
@@ -33,10 +44,24 @@ class RecommendationJobCard extends StatelessWidget {
                   ),
                 ),
               ),
-              SvgPicture.asset(
-                'assets/icons/bookmark.svg',
-                width: 20.w,
-                height: 20.h,
+              Semantics(
+                button: true,
+                label: isBookmarked ? '저장 해제' : '저장',
+                child: InkResponse(
+                  key: ValueKey(isBookmarked ? 'bookmark-filled' : 'bookmark'),
+                  onTap: onBookmarkTap,
+                  radius: 20.r,
+                  child: Padding(
+                    padding: EdgeInsets.all(4.w),
+                    child: SvgPicture.asset(
+                      isBookmarked
+                          ? 'assets/icons/bookmark_fill.svg'
+                          : 'assets/icons/bookmark.svg',
+                      width: 20.w,
+                      height: 20.h,
+                    ),
+                  ),
+                ),
               ),
             ],
           ),
@@ -72,10 +97,13 @@ class RecommendationJobCard extends StatelessWidget {
                 children: [
                   _FitBadge(label: job.fitLabel ?? ''),
                   SizedBox(width: 16.w),
-                  const Expanded(
+                  Expanded(
                     child: Align(
                       alignment: Alignment.centerLeft,
-                      child: _OutlinedAction(label: '관심 없음'),
+                      child: _OutlinedAction(
+                        label: isUninterested ? '해제' : '관심 없음',
+                        onTap: onUninterestedTap,
+                      ),
                     ),
                   ),
                 ],
@@ -172,32 +200,41 @@ class _FitBadge extends StatelessWidget {
 }
 
 class _OutlinedAction extends StatelessWidget {
-  const _OutlinedAction({required this.label, this.expanded = false});
+  const _OutlinedAction({
+    required this.label,
+    this.expanded = false,
+    this.onTap,
+  });
 
   final String label;
   final bool expanded;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
     return SizedBox(
       width: expanded ? double.infinity : 100,
       height: 44,
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          color: AppColors.surface,
-          border: Border.all(color: AppColors.neutral200),
+      child: Material(
+        color: AppColors.surface,
+        shape: RoundedRectangleBorder(
+          side: const BorderSide(color: AppColors.neutral200),
           borderRadius: BorderRadius.circular(8.r),
         ),
-        child: Center(
-          child: Text(
-            label,
-            textAlign: TextAlign.center,
-            style: const TextStyle(
-              color: AppColors.neutral600,
-              fontSize: 14,
-              height: 1.4,
-              fontWeight: FontWeight.w500,
-              letterSpacing: -0.14,
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: onTap,
+          child: Center(
+            child: Text(
+              label,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                color: AppColors.neutral600,
+                fontSize: 14,
+                height: 1.4,
+                fontWeight: FontWeight.w500,
+                letterSpacing: -0.14,
+              ),
             ),
           ),
         ),

@@ -4,39 +4,121 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:geti_app/features/recommendation/presentation/view_model/recommendation_view_model.dart';
 import 'package:geti_app/features/recommendation/presentation/widgets/recommendation_job_card.dart';
 import 'package:geti_app/features/recommendation/presentation/widgets/recommendation_state_content.dart';
+import 'package:geti_app/features/recommendation/presentation/widgets/recommendation_uninterested_bottom_sheet.dart';
 import 'package:geti_app/shared/theme/app_colors.dart';
 import 'package:geti_app/shared/theme/app_typography.dart';
 import 'package:geti_app/shared/widgets/app_bottom_navigation.dart';
 
-class RecommendationView extends ConsumerWidget {
+class RecommendationView extends ConsumerStatefulWidget {
   const RecommendationView({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<RecommendationView> createState() => _RecommendationViewState();
+}
+
+class _RecommendationViewState extends ConsumerState<RecommendationView> {
+  bool _isUninterestedSheetOpen = false;
+
+  @override
+  Widget build(BuildContext context) {
     final state = ref.watch(recommendationViewModelProvider);
     final viewModel = ref.read(recommendationViewModelProvider.notifier);
 
+    ref.listen(
+      recommendationViewModelProvider.select(
+        (value) => value.uninterestedSheetStatus,
+      ),
+      (previous, next) {
+        if (next == UninterestedSheetStatus.hidden &&
+            _isUninterestedSheetOpen &&
+            Navigator.of(context).canPop()) {
+          Navigator.of(context).pop();
+        }
+      },
+    );
+
     return Scaffold(
-      body: SafeArea(
-        bottom: false,
-        child: Column(
-          children: [
-            const _RecommendationHeader(),
-            Expanded(
-              child: RecommendationScreenBody(
-                state: state,
-                onGenerate: viewModel.startGeneration,
-                onRetry: viewModel.startGeneration,
+      body: Stack(
+        children: [
+          SafeArea(
+            bottom: false,
+            child: Column(
+              children: [
+                const _RecommendationHeader(),
+                Expanded(
+                  child: RecommendationScreenBody(
+                    state: state,
+                    onGenerate: viewModel.startGeneration,
+                    onRetry: viewModel.startGeneration,
+                    onUninterested: _showUninterestedSheet,
+                    onBookmark: viewModel.toggleBookmark,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          if (state.showUninterestedSuccess)
+            Positioned(
+              left: 33.w,
+              right: 32.w,
+              bottom: 4.h,
+              child: UninterestedSuccessBanner(
+                onClose: viewModel.dismissUninterestedSuccess,
               ),
             ),
-          ],
-        ),
+        ],
       ),
       bottomNavigationBar: const SafeArea(
         top: false,
         child: AppBottomNavigation(currentIndex: 1),
       ),
     );
+  }
+
+  Future<void> _showUninterestedSheet(RecommendationJob job) async {
+    if (_isUninterestedSheetOpen) return;
+
+    final viewModel = ref.read(recommendationViewModelProvider.notifier);
+    viewModel.openUninterested(job);
+    _isUninterestedSheetOpen = true;
+
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: false,
+      backgroundColor: Colors.transparent,
+      barrierColor: const Color(0x40111111),
+      builder: (context) => Consumer(
+        builder: (context, ref, child) {
+          final state = ref.watch(recommendationViewModelProvider);
+          final selectedJob = state.selectedJob;
+          if (selectedJob == null ||
+              state.uninterestedSheetStatus == UninterestedSheetStatus.hidden) {
+            return const SizedBox.shrink();
+          }
+
+          final viewModel = ref.read(recommendationViewModelProvider.notifier);
+          return RecommendationUninterestedBottomSheet(
+            status: state.uninterestedSheetStatus,
+            job: selectedJob,
+            scope: state.uninterestedScope,
+            isUnsetting: state.isUnsetting,
+            onScopeChanged: viewModel.selectUninterestedScope,
+            onClose: viewModel.closeUninterestedSheet,
+            onConfirm: viewModel.confirmUninterested,
+            onUnset: viewModel.unsetUninterested,
+            onRetry: viewModel.retryUninterested,
+          );
+        },
+      ),
+    );
+
+    _isUninterestedSheetOpen = false;
+    if (mounted &&
+        ref.read(recommendationViewModelProvider).uninterestedSheetStatus !=
+            UninterestedSheetStatus.hidden) {
+      viewModel.closeUninterestedSheet();
+    }
   }
 }
 
@@ -45,12 +127,16 @@ class RecommendationScreenBody extends StatelessWidget {
     required this.state,
     required this.onGenerate,
     required this.onRetry,
+    this.onUninterested,
+    this.onBookmark,
     super.key,
   });
 
   final RecommendationViewState state;
   final VoidCallback onGenerate;
   final VoidCallback onRetry;
+  final ValueChanged<RecommendationJob>? onUninterested;
+  final ValueChanged<RecommendationJob>? onBookmark;
 
   @override
   Widget build(BuildContext context) {
@@ -77,7 +163,16 @@ class RecommendationScreenBody extends StatelessWidget {
               );
             }
 
-            return RecommendationJobCard(job: state.jobs[index - 1]);
+            final job = state.jobs[index - 1];
+            return RecommendationJobCard(
+              job: job,
+              isUninterested: state.uninterestedJobs.contains(job),
+              isBookmarked: state.bookmarkedJobs.contains(job),
+              onBookmarkTap: onBookmark == null ? null : () => onBookmark!(job),
+              onUninterestedTap: onUninterested == null
+                  ? null
+                  : () => onUninterested!(job),
+            );
           },
         ),
       ),
