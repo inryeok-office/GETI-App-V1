@@ -1,4 +1,4 @@
-import 'package:geti_app/features/counter/presentation/view/counter_view.dart';
+import 'package:geti_app/features/recommendation/presentation/view/recommendation_view.dart';
 import 'package:go_router/go_router.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
@@ -10,8 +10,8 @@ GoRouter appRouter(Ref ref) {
     routes: [
       GoRoute(
         path: '/',
-        name: 'counter',
-        builder: (context, state) => const CounterView(),
+        name: 'recommendation',
+        builder: (context, state) => const RecommendationView(),
       ),
     ],
   );
