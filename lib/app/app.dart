@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:geti_app/app/router/app_router.dart';
+import 'package:geti_app/shared/theme/app_theme.dart';
 import 'package:responsive_framework/responsive_framework.dart';
 
 class GetiApp extends ConsumerWidget {
@@ -19,9 +20,7 @@ class GetiApp extends ConsumerWidget {
         return MaterialApp.router(
           title: 'GETI',
           debugShowCheckedModeBanner: false,
-          theme: ThemeData(
-            colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
-          ),
+          theme: AppTheme.light,
           routerConfig: router,
           builder: (context, child) {
             return ResponsiveBreakpoints.builder(
