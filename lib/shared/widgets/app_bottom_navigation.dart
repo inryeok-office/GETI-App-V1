@@ -65,11 +65,19 @@ class AppBottomNavigation extends StatelessWidget {
                                 'assets/icons/nav_notification_top.svg',
                                 width: 20.w,
                                 height: 20.h,
+                                colorFilter: ColorFilter.mode(
+                                  color,
+                                  BlendMode.srcIn,
+                                ),
                               ),
                               SvgPicture.asset(
                                 'assets/icons/nav_notification_bottom.svg',
                                 width: 20.w,
                                 height: 20.h,
+                                colorFilter: ColorFilter.mode(
+                                  color,
+                                  BlendMode.srcIn,
+                                ),
                               ),
                             ],
                           ),
@@ -79,6 +87,7 @@ class AppBottomNavigation extends StatelessWidget {
                           item.assetPath,
                           width: 20.w,
                           height: 20.h,
+                          colorFilter: ColorFilter.mode(color, BlendMode.srcIn),
                         ),
                       SizedBox(height: 4.h),
                       Text(
