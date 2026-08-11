@@ -1,6 +1,7 @@
 import 'package:geti_app/features/application/presentation/view/application_view.dart';
 import 'package:geti_app/features/application/presentation/view/application_detail_view.dart';
 import 'package:geti_app/features/recommendation/presentation/view/recommendation_view.dart';
+import 'package:geti_app/features/program/presentation/view/program_view.dart';
 import 'package:go_router/go_router.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
@@ -14,6 +15,11 @@ GoRouter appRouter(Ref ref) {
         path: '/',
         name: 'recommendation',
         builder: (context, state) => const RecommendationView(),
+      ),
+      GoRoute(
+        path: '/programs',
+        name: 'programs',
+        builder: (context, state) => const ProgramView(),
       ),
       GoRoute(
         path: '/applications',
