@@ -34,8 +34,24 @@ dependencies:
   # The following adds the Cupertino Icons font to your application.
   # Use with the CupertinoIcons class for iOS style icons.
   cupertino_icons: ^1.0.8
+  dio: ^5.11.0
+  # Keep the Riverpod runtime, annotations, and generator on one compatible set.
+  flutter_riverpod: 3.2.1
+  flutter_screenutil: ^5.9.3
+  flutter_svg: ^2.2.3
+  flutter_secure_storage: ^10.3.1
+  freezed_annotation: ^3.1.0
+  go_router: ^17.3.0
+  json_annotation: 4.11.0
+  responsive_framework: ^1.5.1
+  retrofit: ^4.9.2
+  riverpod_annotation: 4.0.2
+  shared_preferences: ^2.5.5
 
 dev_dependencies:
+  # 2.15.2+ requires an analyzer/meta combination newer than Flutter 3.44.6.
+  build_runner: 2.15.1
+  freezed: ^3.2.5
   flutter_test:
     sdk: flutter
 
@@ -45,6 +61,10 @@ dev_dependencies:
   # package. See that file for information about deactivating specific lint
   # rules and activating additional ones.
   flutter_lints: ^6.0.0
+  # These versions share Analyzer 9 with Freezed and Riverpod Generator.
+  json_serializable: 6.13.0
+  retrofit_generator: ^10.2.8
+  riverpod_generator: 4.0.3
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
@@ -56,6 +76,20 @@ flutter:
   # included with your application, so that you can use the icons in
   # the material Icons class.
   uses-material-design: true
+
+  assets:
+    - assets/images/
+    - assets/icons/
+
+  fonts:
+    - family: Pretendard
+      fonts:
+        - asset: assets/fonts/PretendardVariable.ttf
+          weight: 400
+        - asset: assets/fonts/PretendardVariable.ttf
+          weight: 500
+        - asset: assets/fonts/PretendardVariable.ttf
+          weight: 600
 
   # To add assets to your application, add an assets section, like this:
   # assets:

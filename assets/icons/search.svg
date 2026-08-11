@@ -1,0 +1,10 @@
+<svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+<rect width="20" height="20" fill="#F5F5F5"/>
+<g id="Icon">
+<rect width="848" height="1291" transform="translate(-32 -1160)" fill="white"/>
+<g id="Icon/Search">
+<path id="Vector" d="M9 14.75C12.1756 14.75 14.75 12.1756 14.75 9C14.75 5.82436 12.1756 3.25 9 3.25C5.82436 3.25 3.25 5.82436 3.25 9C3.25 12.1756 5.82436 14.75 9 14.75Z" stroke="#525252" stroke-width="1.5"/>
+<path id="Vector_2" d="M13.25 13.25L17 17" stroke="#525252" stroke-width="1.5" stroke-linecap="round"/>
+</g>
+</g>
+</svg>

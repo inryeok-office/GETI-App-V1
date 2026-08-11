@@ -1,30 +1,46 @@
-// This is a basic Flutter widget test.
-//
-// To perform an interaction with a widget in your test, use the WidgetTester
-// utility in the flutter_test package. For example, you can send tap and scroll
-// gestures. You can also use WidgetTester to find child widgets in the widget
-// tree, read text, and verify that the values of widget properties are correct.
-
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:flutter_test/flutter_test.dart';
-
-import 'package:geti_app/main.dart';
+import 'package:geti_app/app/app.dart';
+import 'package:geti_app/shared/theme/app_colors.dart';
 
 void main() {
-  testWidgets('Counter increments smoke test', (WidgetTester tester) async {
-    // Build our app and trigger a frame.
-    await tester.pumpWidget(const MyApp());
+  testWidgets('기본 경로에서 맞춤 추천 결과를 표시한다', (tester) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
 
-    // Verify that our counter starts at 0.
-    expect(find.text('0'), findsOneWidget);
-    expect(find.text('1'), findsNothing);
+    await tester.pumpWidget(const ProviderScope(child: GetiApp()));
+    await tester.pumpAndSettle();
 
-    // Tap the '+' icon and trigger a frame.
-    await tester.tap(find.byIcon(Icons.add));
-    await tester.pump();
+    expect(find.text('맞춤 추천'), findsOneWidget);
+    expect(find.text('추천 공고 6개'), findsOneWidget);
+    expect(find.text('Cloud Platform Engineer'), findsAtLeastNWidgets(1));
+    expect(find.text('공고'), findsOneWidget);
 
-    // Verify that our counter has incremented.
-    expect(find.text('0'), findsNothing);
-    expect(find.text('1'), findsOneWidget);
+    final homeNavigation = find.byWidgetPredicate(
+      (widget) => widget is Semantics && widget.properties.label == '홈',
+    );
+    final jobsNavigation = find.byWidgetPredicate(
+      (widget) => widget is Semantics && widget.properties.label == '공고',
+    );
+    final homeIcon = tester.widget<SvgPicture>(
+      find.descendant(of: homeNavigation, matching: find.byType(SvgPicture)),
+    );
+    final jobsIcon = tester.widget<SvgPicture>(
+      find.descendant(of: jobsNavigation, matching: find.byType(SvgPicture)),
+    );
+
+    expect(
+      homeIcon.colorFilter,
+      const ColorFilter.mode(AppColors.primaryAccent, BlendMode.srcIn),
+    );
+    expect(
+      jobsIcon.colorFilter,
+      const ColorFilter.mode(AppColors.neutral500, BlendMode.srcIn),
+    );
+    expect(tester.takeException(), isNull);
   });
 }
