@@ -6,68 +6,80 @@ import 'package:geti_app/shared/theme/app_colors.dart';
 import 'package:geti_app/shared/theme/app_typography.dart';
 
 class ApplicationCard extends StatelessWidget {
-  const ApplicationCard({required this.application, super.key});
+  const ApplicationCard({required this.application, this.onTap, super.key});
 
   final ApplicationItem application;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
     final badgeStyle = _badgeStyle(application.status);
-    return Container(
-      width: double.infinity,
-      padding: EdgeInsets.all(16.w),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        border: Border.all(color: AppColors.neutral200),
+    return Semantics(
+      button: onTap != null,
+      child: InkWell(
+        onTap: onTap,
         borderRadius: BorderRadius.circular(8.r),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            application.companyName,
-            style: AppTypography.caption.copyWith(color: AppColors.neutral600),
+        child: Container(
+          width: double.infinity,
+          padding: EdgeInsets.all(16.w),
+          decoration: BoxDecoration(
+            color: AppColors.surface,
+            border: Border.all(color: AppColors.neutral200),
+            borderRadius: BorderRadius.circular(8.r),
           ),
-          SizedBox(height: 4.h),
-          Row(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Expanded(
-                child: Text(
-                  application.positionName,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: AppTypography.heading3.copyWith(
-                    color: application.isDeleted
-                        ? AppColors.neutral600
-                        : AppColors.neutral900,
-                  ),
+              Text(
+                application.companyName,
+                style: AppTypography.caption.copyWith(
+                  color: AppColors.neutral600,
                 ),
               ),
-              SizedBox(width: 8.w),
-              _StatusBadge(style: badgeStyle),
-              if (!application.isDeleted) ...[
-                SizedBox(width: 16.w),
-                SvgPicture.asset(
-                  'assets/icons/chevron_right.svg',
-                  width: 18.w,
-                  height: 18.h,
+              SizedBox(height: 4.h),
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      application.positionName,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: AppTypography.heading3.copyWith(
+                        color: application.isDeleted
+                            ? AppColors.neutral600
+                            : AppColors.neutral900,
+                      ),
+                    ),
+                  ),
+                  SizedBox(width: 8.w),
+                  _StatusBadge(style: badgeStyle),
+                  if (onTap != null && !application.isDeleted) ...[
+                    SizedBox(width: 16.w),
+                    SvgPicture.asset(
+                      'assets/icons/chevron_right.svg',
+                      width: 18.w,
+                      height: 18.h,
+                    ),
+                  ],
+                ],
+              ),
+              if (application.isDeleted) ...[
+                SizedBox(height: 8.h),
+                Text(
+                  '공고가 삭제되어 상세 내용을 확인할 수 없습니다.',
+                  style: AppTypography.caption.copyWith(color: AppColors.error),
                 ),
               ],
+              SizedBox(height: 8.h),
+              Text(
+                '제출일 ${application.submittedDate}',
+                style: AppTypography.caption.copyWith(
+                  color: AppColors.neutral900,
+                ),
+              ),
             ],
           ),
-          if (application.isDeleted) ...[
-            SizedBox(height: 8.h),
-            Text(
-              '공고가 삭제되어 상세 내용을 확인할 수 없습니다.',
-              style: AppTypography.caption.copyWith(color: AppColors.error),
-            ),
-          ],
-          SizedBox(height: 8.h),
-          Text(
-            '제출일 ${application.submittedDate}',
-            style: AppTypography.caption.copyWith(color: AppColors.neutral900),
-          ),
-        ],
+        ),
       ),
     );
   }

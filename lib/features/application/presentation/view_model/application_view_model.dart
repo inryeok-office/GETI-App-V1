@@ -19,6 +19,7 @@ enum ApplicationProgressStatus {
 
 class ApplicationItem {
   const ApplicationItem({
+    this.id = 'submitted',
     required this.companyName,
     required this.positionName,
     required this.status,
@@ -26,11 +27,26 @@ class ApplicationItem {
     this.isDeleted = false,
   });
 
+  final String id;
   final String companyName;
   final String positionName;
   final ApplicationProgressStatus status;
   final String submittedDate;
   final bool isDeleted;
+
+  String? get detailId {
+    if (isDeleted) return 'deleted';
+    return switch (status) {
+      ApplicationProgressStatus.submitted => 'submitted',
+      ApplicationProgressStatus.revisionRequested => 'revision',
+      ApplicationProgressStatus.cancelled => 'cancelled',
+      ApplicationProgressStatus.reviewing ||
+      ApplicationProgressStatus.interviewing ||
+      ApplicationProgressStatus.accepted ||
+      ApplicationProgressStatus.rejected ||
+      ApplicationProgressStatus.ended => null,
+    };
+  }
 }
 
 class ApplicationViewState {
@@ -105,18 +121,21 @@ class ApplicationViewModel extends _$ApplicationViewModel {
 
 const mockApplications = [
   ApplicationItem(
+    id: 'reviewing',
     companyName: '당근',
     positionName: '웹 프론트엔드 인턴',
     status: ApplicationProgressStatus.submitted,
     submittedDate: '2026.08.01',
   ),
   ApplicationItem(
+    id: 'interviewing',
     companyName: '토스페이먼츠',
     positionName: 'Frontend Developer',
     status: ApplicationProgressStatus.reviewing,
     submittedDate: '2026.08.01',
   ),
   ApplicationItem(
+    id: 'deleted',
     companyName: '네이버클라우드',
     positionName: '삭제된 공고',
     status: ApplicationProgressStatus.cancelled,
@@ -124,30 +143,35 @@ const mockApplications = [
     isDeleted: true,
   ),
   ApplicationItem(
+    id: 'revision',
     companyName: '당근',
     positionName: '웹 프론트엔드 인턴',
     status: ApplicationProgressStatus.revisionRequested,
     submittedDate: '2026.08.01',
   ),
   ApplicationItem(
+    id: 'accepted',
     companyName: '당근',
     positionName: '웹 프론트엔드 인턴',
     status: ApplicationProgressStatus.interviewing,
     submittedDate: '2026.08.01',
   ),
   ApplicationItem(
+    id: 'rejected',
     companyName: '당근',
     positionName: '웹 프론트엔드 인턴',
     status: ApplicationProgressStatus.accepted,
     submittedDate: '2026.08.01',
   ),
   ApplicationItem(
+    id: 'submitted',
     companyName: '당근',
     positionName: '웹 프론트엔드 인턴',
     status: ApplicationProgressStatus.rejected,
     submittedDate: '2026.08.01',
   ),
   ApplicationItem(
+    id: 'deleted',
     companyName: '네이버클라우드',
     positionName: '삭제된 공고',
     status: ApplicationProgressStatus.ended,

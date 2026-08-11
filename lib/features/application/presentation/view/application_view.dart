@@ -8,6 +8,7 @@ import 'package:geti_app/features/application/presentation/widgets/application_s
 import 'package:geti_app/shared/theme/app_colors.dart';
 import 'package:geti_app/shared/theme/app_typography.dart';
 import 'package:geti_app/shared/widgets/app_bottom_navigation.dart';
+import 'package:go_router/go_router.dart';
 
 class ApplicationView extends ConsumerWidget {
   const ApplicationView({super.key});
@@ -110,8 +111,16 @@ class ApplicationScreenBody extends StatelessWidget {
       padding: EdgeInsets.only(bottom: 24.h),
       itemCount: applications.length,
       separatorBuilder: (context, index) => SizedBox(height: 12.h),
-      itemBuilder: (context, index) =>
-          ApplicationCard(application: applications[index]),
+      itemBuilder: (context, index) {
+        final application = applications[index];
+        final detailId = application.detailId;
+        return ApplicationCard(
+          application: application,
+          onTap: detailId == null
+              ? null
+              : () => context.push('/applications/$detailId'),
+        );
+      },
     );
   }
 }
