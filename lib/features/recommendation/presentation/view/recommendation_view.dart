@@ -70,7 +70,7 @@ class _RecommendationViewState extends ConsumerState<RecommendationView> {
       ),
       bottomNavigationBar: const SafeArea(
         top: false,
-        child: AppBottomNavigation(currentIndex: 1),
+        child: AppBottomNavigation(currentIndex: 0),
       ),
     );
   }
