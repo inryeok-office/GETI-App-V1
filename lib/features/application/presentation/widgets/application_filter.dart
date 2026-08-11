@@ -49,7 +49,7 @@ class ApplicationFilterControl extends StatelessWidget {
                       style: AppTypography.captionMedium.copyWith(
                         color: isSelected
                             ? AppColors.onPrimary
-                            : const Color(0xFF474D57),
+                            : AppColors.neutral600,
                       ),
                     ),
                   ),

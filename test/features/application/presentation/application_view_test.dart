@@ -166,8 +166,20 @@ void main() {
   testWidgets('지원 내역 없음 상태를 표시한다', (tester) async {
     await _pumpState(tester, ApplicationScreenStatus.empty);
     expect(find.text('지원 내역이 없습니다.'), findsOneWidget);
-    expect(find.text('새로운 공고 둘러보기'), findsOneWidget);
+    expect(find.text('새로운 공고 둘러보기'), findsNothing);
     expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('공고 이동 콜백이 있으면 빈 상태 버튼이 동작한다', (tester) async {
+    var browseJobsRequested = false;
+    await _pumpState(
+      tester,
+      ApplicationScreenStatus.empty,
+      onBrowseJobs: () => browseJobsRequested = true,
+    );
+
+    await tester.tap(find.text('새로운 공고 둘러보기'));
+    expect(browseJobsRequested, isTrue);
   });
 }
 
@@ -192,6 +204,7 @@ Future<void> _pumpState(
   WidgetTester tester,
   ApplicationScreenStatus status, {
   VoidCallback? onRetry,
+  VoidCallback? onBrowseJobs,
 }) {
   return _pumpWidget(
     tester,
@@ -199,6 +212,7 @@ Future<void> _pumpState(
       state: ApplicationViewState(screenStatus: status),
       onFilterSelected: (_) {},
       onRetry: onRetry ?? () {},
+      onBrowseJobs: onBrowseJobs,
     ),
   );
 }

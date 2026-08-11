@@ -8,11 +8,13 @@ class ApplicationStateContent extends StatelessWidget {
   const ApplicationStateContent({
     required this.status,
     required this.onRetry,
+    this.onBrowseJobs,
     super.key,
   });
 
   final ApplicationScreenStatus status;
   final VoidCallback onRetry;
+  final VoidCallback? onBrowseJobs;
 
   @override
   Widget build(BuildContext context) {
@@ -84,12 +86,12 @@ class ApplicationStateContent extends StatelessWidget {
               child: Text(
                 definition.description,
                 textAlign: TextAlign.center,
-                style: AppTypography.body.copyWith(
-                  color: AppColors.stateDescription,
-                ),
+                style: AppTypography.body.copyWith(color: AppColors.stateBody),
               ),
             ),
-            if (definition.actionLabel != null) ...[
+            if (definition.actionLabel != null &&
+                (status == ApplicationScreenStatus.networkError ||
+                    onBrowseJobs != null)) ...[
               SizedBox(height: 16.h),
               SizedBox(
                 width: 280.w,
@@ -97,12 +99,10 @@ class ApplicationStateContent extends StatelessWidget {
                 child: FilledButton(
                   onPressed: status == ApplicationScreenStatus.networkError
                       ? onRetry
-                      : null,
+                      : onBrowseJobs,
                   style: FilledButton.styleFrom(
                     backgroundColor: AppColors.primary,
-                    disabledBackgroundColor: AppColors.primary,
                     foregroundColor: AppColors.onPrimary,
-                    disabledForegroundColor: AppColors.onPrimary,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(8.r),
                     ),

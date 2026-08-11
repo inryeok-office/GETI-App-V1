@@ -46,12 +46,14 @@ class ApplicationScreenBody extends StatelessWidget {
     required this.state,
     required this.onFilterSelected,
     required this.onRetry,
+    this.onBrowseJobs,
     super.key,
   });
 
   final ApplicationViewState state;
   final ValueChanged<ApplicationFilter> onFilterSelected;
   final VoidCallback onRetry;
+  final VoidCallback? onBrowseJobs;
 
   @override
   Widget build(BuildContext context) {
@@ -91,6 +93,7 @@ class ApplicationScreenBody extends StatelessWidget {
       return ApplicationStateContent(
         status: state.screenStatus,
         onRetry: onRetry,
+        onBrowseJobs: onBrowseJobs,
       );
     }
 
@@ -99,6 +102,7 @@ class ApplicationScreenBody extends StatelessWidget {
       return ApplicationStateContent(
         status: ApplicationScreenStatus.empty,
         onRetry: onRetry,
+        onBrowseJobs: onBrowseJobs,
       );
     }
 
@@ -137,16 +141,12 @@ class _ApplicationHeader extends StatelessWidget {
                 ),
               ),
             ),
-            const Expanded(
+            Expanded(
               child: Text(
                 '내 지원',
                 textAlign: TextAlign.center,
-                style: TextStyle(
+                style: AppTypography.heading3.copyWith(
                   color: AppColors.neutral900,
-                  fontSize: 18,
-                  height: 1.4,
-                  fontWeight: FontWeight.w600,
-                  letterSpacing: -0.18,
                 ),
               ),
             ),

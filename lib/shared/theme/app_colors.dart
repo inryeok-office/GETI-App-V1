@@ -15,13 +15,11 @@ abstract final class AppColors {
   static const surface = Color(0xFFFFFFFF);
   static const onSurface = Color(0xFF111111);
   static const neutral900 = Color(0xFF111111);
-  static const neutral50 = Color(0xFFFAFAFA);
   static const neutral600 = Color(0xFF525252);
   static const neutral500 = Color(0xFF737373);
   static const neutral200 = Color(0xFFE5E5E5);
   static const stateTitle = Color(0xFF141417);
   static const stateBody = Color(0xFF6B707A);
-  static const stateDescription = Color(0xFF616670);
   static const stateIconBackground = Color(0xFFF2F5F7);
   static const warning = Color(0xFFF59E0B);
   static const warningBackground = Color(0xFFFFF7DB);
