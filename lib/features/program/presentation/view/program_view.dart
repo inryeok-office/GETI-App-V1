@@ -7,6 +7,7 @@ import 'package:geti_app/features/program/presentation/widgets/program_state_con
 import 'package:geti_app/shared/theme/app_colors.dart';
 import 'package:geti_app/shared/theme/app_typography.dart';
 import 'package:geti_app/shared/widgets/app_bottom_navigation.dart';
+import 'package:go_router/go_router.dart';
 
 class ProgramView extends ConsumerWidget {
   const ProgramView({super.key});
@@ -94,7 +95,13 @@ class ProgramScreenBody extends StatelessWidget {
       padding: EdgeInsets.only(bottom: 24.h),
       itemCount: programs.length,
       separatorBuilder: (_, _) => SizedBox(height: 12.h),
-      itemBuilder: (_, index) => ProgramCard(program: programs[index]),
+      itemBuilder: (context, index) {
+        final program = programs[index];
+        return ProgramCard(
+          program: program,
+          onTap: () => context.push('/programs/${program.id}'),
+        );
+      },
     );
   }
 }

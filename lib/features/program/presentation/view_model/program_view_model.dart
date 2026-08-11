@@ -9,6 +9,7 @@ enum ProgramRecruitmentStatus { recruiting, full, upcoming, closed }
 
 class ProgramItem {
   const ProgramItem({
+    required this.id,
     required this.title,
     required this.schedule,
     required this.location,
@@ -16,6 +17,7 @@ class ProgramItem {
     required this.status,
     this.isApplied = false,
   });
+  final String id;
   final String title;
   final String schedule;
   final String location;
@@ -64,6 +66,7 @@ class ProgramViewModel extends _$ProgramViewModel {
 
 const mockPrograms = [
   ProgramItem(
+    id: 'applied',
     title: '현직자와 함께하는 프론트엔드 특강',
     schedule: '08.12 14:00–16:00',
     location: '광주소프트웨어마이스터고 시청각실',
@@ -72,6 +75,7 @@ const mockPrograms = [
     isApplied: true,
   ),
   ProgramItem(
+    id: 'full',
     title: '2026 하반기 취업 전략 설명회',
     schedule: '08.18 13:00–15:00',
     location: '광주소프트웨어마이스터고 시청각실',
@@ -79,6 +83,7 @@ const mockPrograms = [
     status: ProgramRecruitmentStatus.full,
   ),
   ProgramItem(
+    id: 'upcoming',
     title: '포트폴리오 1:1 멘토링',
     schedule: '08.25 10:00–17:00',
     location: '광주소프트웨어마이스터고 시청각실',
@@ -86,10 +91,19 @@ const mockPrograms = [
     status: ProgramRecruitmentStatus.upcoming,
   ),
   ProgramItem(
+    id: 'closed',
     title: '포트폴리오 1:1 멘토링',
     schedule: '08.25 10:00–17:00',
     location: '광주소프트웨어마이스터고 시청각실',
     applicationPeriod: '2026.08.01 – 2026.08.20',
     status: ProgramRecruitmentStatus.closed,
+  ),
+  ProgramItem(
+    id: 'available',
+    title: '현직자와 함께하는 프론트엔드 특강',
+    schedule: '08.12 14:00–16:00',
+    location: '광주소프트웨어마이스터고 시청각실',
+    applicationPeriod: '2026.07.20 – 2026.08.10',
+    status: ProgramRecruitmentStatus.recruiting,
   ),
 ];
