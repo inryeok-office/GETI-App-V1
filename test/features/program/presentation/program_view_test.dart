@@ -10,7 +10,7 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   testWidgets('전체 목록과 홈 활성 상태를 표시한다', (tester) async {
     await _pumpView(tester);
-    expect(mockPrograms, hasLength(4));
+    expect(mockPrograms, hasLength(5));
     expect(find.byType(ProgramCard), findsWidgets);
     final home = tester.widget<Semantics>(
       find.byWidgetPredicate(

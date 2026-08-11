@@ -2,6 +2,7 @@ import 'package:geti_app/features/application/presentation/view/application_view
 import 'package:geti_app/features/application/presentation/view/application_detail_view.dart';
 import 'package:geti_app/features/recommendation/presentation/view/recommendation_view.dart';
 import 'package:geti_app/features/program/presentation/view/program_view.dart';
+import 'package:geti_app/features/program/presentation/view/program_detail_view.dart';
 import 'package:go_router/go_router.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
@@ -20,6 +21,15 @@ GoRouter appRouter(Ref ref) {
         path: '/programs',
         name: 'programs',
         builder: (context, state) => const ProgramView(),
+        routes: [
+          GoRoute(
+            path: ':programId',
+            name: 'program-detail',
+            builder: (context, state) => ProgramDetailView(
+              programId: state.pathParameters['programId']!,
+            ),
+          ),
+        ],
       ),
       GoRoute(
         path: '/applications',
