@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 abstract final class AppColors {
   static const primary = Color(0xFF17627A);
   static const primaryAccent = Color(0xFF2890B1);
+  static const primaryDark = Color(0xFF15516A);
   static const primarySubtle = Color(0xFFEAF6F9);
   static const primarySurface = Color(0xFFF6FBFC);
   static const onPrimary = Color(0xFFFFFFFF);
@@ -19,6 +20,10 @@ abstract final class AppColors {
   static const neutral200 = Color(0xFFE5E5E5);
   static const stateTitle = Color(0xFF141417);
   static const stateBody = Color(0xFF6B707A);
+  static const stateIconBackground = Color(0xFFF2F5F7);
+  static const warning = Color(0xFFF59E0B);
+  static const warningBackground = Color(0xFFFFF7DB);
+  static const dangerBackground = Color(0xFFFEF2F2);
   static const error = Color(0xFFEF4444);
   static const onError = Color(0xFFFFFFFF);
 }
