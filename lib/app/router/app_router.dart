@@ -1,5 +1,8 @@
 import 'package:geti_app/features/application/presentation/view/application_view.dart';
 import 'package:geti_app/features/application/presentation/view/application_detail_view.dart';
+import 'package:geti_app/features/job/presentation/view/job_bookmark_view.dart';
+import 'package:geti_app/features/job/presentation/view/job_detail_view.dart';
+import 'package:geti_app/features/job/presentation/view/job_view.dart';
 import 'package:geti_app/features/recommendation/presentation/view/recommendation_view.dart';
 import 'package:geti_app/features/program/presentation/view/program_view.dart';
 import 'package:geti_app/features/program/presentation/view/program_detail_view.dart';
@@ -16,6 +19,24 @@ GoRouter appRouter(Ref ref) {
         path: '/',
         name: 'recommendation',
         builder: (context, state) => const RecommendationView(),
+      ),
+      GoRoute(
+        path: '/jobs',
+        name: 'jobs',
+        builder: (context, state) => const JobView(),
+        routes: [
+          GoRoute(
+            path: 'bookmarks',
+            name: 'job-bookmarks',
+            builder: (context, state) => const JobBookmarkView(),
+          ),
+          GoRoute(
+            path: ':jobId',
+            name: 'job-detail',
+            builder: (context, state) =>
+                JobDetailView(jobId: state.pathParameters['jobId']!),
+          ),
+        ],
       ),
       GoRoute(
         path: '/programs',
