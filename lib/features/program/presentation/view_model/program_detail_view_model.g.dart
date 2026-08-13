@@ -9,6 +9,54 @@ part of 'program_detail_view_model.dart';
 // GENERATED CODE - DO NOT MODIFY BY HAND
 // ignore_for_file: type=lint, type=warning
 
+@ProviderFor(programApplicationOutcome)
+final programApplicationOutcomeProvider = ProgramApplicationOutcomeProvider._();
+
+final class ProgramApplicationOutcomeProvider
+    extends
+        $FunctionalProvider<
+          ProgramApplicationOutcome,
+          ProgramApplicationOutcome,
+          ProgramApplicationOutcome
+        >
+    with $Provider<ProgramApplicationOutcome> {
+  ProgramApplicationOutcomeProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'programApplicationOutcomeProvider',
+        isAutoDispose: true,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$programApplicationOutcomeHash();
+
+  @$internal
+  @override
+  $ProviderElement<ProgramApplicationOutcome> $createElement(
+    $ProviderPointer pointer,
+  ) => $ProviderElement(pointer);
+
+  @override
+  ProgramApplicationOutcome create(Ref ref) {
+    return programApplicationOutcome(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(ProgramApplicationOutcome value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<ProgramApplicationOutcome>(value),
+    );
+  }
+}
+
+String _$programApplicationOutcomeHash() =>
+    r'02c8a35e5f81e8223b8a61c126296c6d5fc28802';
+
 @ProviderFor(ProgramDetailViewModel)
 final programDetailViewModelProvider = ProgramDetailViewModelFamily._();
 
@@ -60,7 +108,7 @@ final class ProgramDetailViewModelProvider
 }
 
 String _$programDetailViewModelHash() =>
-    r'2ae82caa387b6fbb688dc6d542224c3d0844cbfd';
+    r'15a855aabd17e160b5f770021ae56ce514384ec8';
 
 final class ProgramDetailViewModelFamily extends $Family
     with

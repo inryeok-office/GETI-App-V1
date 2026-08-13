@@ -2,7 +2,22 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 part 'program_detail_view_model.g.dart';
 
-enum ProgramDetailActionStatus { available, upcoming, full, closed, applied }
+enum ProgramDetailActionStatus {
+  available,
+  applying,
+  concurrencyFailure,
+  upcoming,
+  full,
+  closed,
+  applied,
+}
+
+enum ProgramApplicationOutcome { success, concurrencyFailure }
+
+@riverpod
+ProgramApplicationOutcome programApplicationOutcome(Ref ref) {
+  return ProgramApplicationOutcome.success;
+}
 
 class ProgramDetail {
   const ProgramDetail({
@@ -38,11 +53,35 @@ class ProgramDetail {
   final String currentApplicants;
   final String remainingCapacity;
   final String admissionType;
+
+  ProgramDetail copyWith({ProgramDetailActionStatus? actionStatus}) {
+    return ProgramDetail(
+      id: id,
+      title: title,
+      actionStatus: actionStatus ?? this.actionStatus,
+      category: category,
+      recruitmentBadge: recruitmentBadge,
+      applicationPeriod: applicationPeriod,
+      viewCount: viewCount,
+      schedule: schedule,
+      location: location,
+      capacity: capacity,
+      description: description,
+      recruitmentCapacity: recruitmentCapacity,
+      currentApplicants: currentApplicants,
+      remainingCapacity: remainingCapacity,
+      admissionType: admissionType,
+    );
+  }
 }
 
 class ProgramDetailViewState {
   const ProgramDetailViewState({this.detail});
   final ProgramDetail? detail;
+
+  ProgramDetailViewState copyWith({ProgramDetail? detail}) {
+    return ProgramDetailViewState(detail: detail ?? this.detail);
+  }
 }
 
 @riverpod
@@ -50,6 +89,44 @@ class ProgramDetailViewModel extends _$ProgramDetailViewModel {
   @override
   ProgramDetailViewState build(String programId) {
     return ProgramDetailViewState(detail: mockProgramDetails[programId]);
+  }
+
+  Future<void> applyProgram() async {
+    final detail = state.detail;
+    if (detail == null ||
+        detail.actionStatus != ProgramDetailActionStatus.available) {
+      return;
+    }
+
+    state = state.copyWith(
+      detail: detail.copyWith(actionStatus: ProgramDetailActionStatus.applying),
+    );
+    await Future<void>.delayed(const Duration(milliseconds: 700));
+    if (!ref.mounted) return;
+
+    final outcome = ref.read(programApplicationOutcomeProvider);
+    state = state.copyWith(
+      detail: state.detail!.copyWith(
+        actionStatus: switch (outcome) {
+          ProgramApplicationOutcome.success =>
+            ProgramDetailActionStatus.applied,
+          ProgramApplicationOutcome.concurrencyFailure =>
+            ProgramDetailActionStatus.concurrencyFailure,
+        },
+      ),
+    );
+  }
+
+  void confirmConcurrencyFailure() {
+    final detail = state.detail;
+    if (detail?.actionStatus != ProgramDetailActionStatus.concurrencyFailure) {
+      return;
+    }
+    state = state.copyWith(
+      detail: detail!.copyWith(
+        actionStatus: ProgramDetailActionStatus.available,
+      ),
+    );
   }
 }
 
