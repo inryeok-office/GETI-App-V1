@@ -104,7 +104,7 @@ final class ProgramCancellationOutcomeProvider
 }
 
 String _$programCancellationOutcomeHash() =>
-    r'05f7da47c54ed9c7f84d75eb6e52a07993046d7b';
+    r'9312628e45094c27b6dafa74b62792828618a85f';
 
 @ProviderFor(ProgramDetailViewModel)
 final programDetailViewModelProvider = ProgramDetailViewModelFamily._();
@@ -157,7 +157,7 @@ final class ProgramDetailViewModelProvider
 }
 
 String _$programDetailViewModelHash() =>
-    r'15a855aabd17e160b5f770021ae56ce514384ec8';
+    r'811771851e3f61a14725dc48cfd35ed82eb3ba4b';
 
 final class ProgramDetailViewModelFamily extends $Family
     with
