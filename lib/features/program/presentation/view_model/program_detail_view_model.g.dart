@@ -57,6 +57,55 @@ final class ProgramApplicationOutcomeProvider
 String _$programApplicationOutcomeHash() =>
     r'02c8a35e5f81e8223b8a61c126296c6d5fc28802';
 
+@ProviderFor(programCancellationOutcome)
+final programCancellationOutcomeProvider =
+    ProgramCancellationOutcomeProvider._();
+
+final class ProgramCancellationOutcomeProvider
+    extends
+        $FunctionalProvider<
+          ProgramCancellationOutcome,
+          ProgramCancellationOutcome,
+          ProgramCancellationOutcome
+        >
+    with $Provider<ProgramCancellationOutcome> {
+  ProgramCancellationOutcomeProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'programCancellationOutcomeProvider',
+        isAutoDispose: true,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$programCancellationOutcomeHash();
+
+  @$internal
+  @override
+  $ProviderElement<ProgramCancellationOutcome> $createElement(
+    $ProviderPointer pointer,
+  ) => $ProviderElement(pointer);
+
+  @override
+  ProgramCancellationOutcome create(Ref ref) {
+    return programCancellationOutcome(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(ProgramCancellationOutcome value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<ProgramCancellationOutcome>(value),
+    );
+  }
+}
+
+String _$programCancellationOutcomeHash() =>
+    r'05f7da47c54ed9c7f84d75eb6e52a07993046d7b';
+
 @ProviderFor(ProgramDetailViewModel)
 final programDetailViewModelProvider = ProgramDetailViewModelFamily._();
 
