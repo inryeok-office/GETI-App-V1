@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:geti_app/features/job/presentation/view/job_bookmark_view.dart';
 import 'package:geti_app/features/job/presentation/view/job_detail_view.dart';
 import 'package:geti_app/features/job/presentation/view/job_view.dart';
+import 'package:geti_app/shared/widgets/app_bottom_navigation.dart';
 import 'package:go_router/go_router.dart';
 
 void main() {
@@ -77,6 +78,44 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('마감된 공고는 상세에서 지원 버튼이 비활성화된다', (tester) async {
+    await _pumpRoute(tester, '/jobs/woowa-frontend');
+
+    expect(find.text('마감된 공고입니다'), findsOneWidget);
+
+    final button = tester.widget<ElevatedButton>(
+      find.byKey(const ValueKey('job-detail-apply')),
+    );
+    expect(button.onPressed, isNull);
+
+    await tester.tap(find.byKey(const ValueKey('job-detail-apply')));
+    await tester.pumpAndSettle();
+    expect(find.text('내 지원 목록'), findsNothing);
+    expect(find.text('외부 채용 페이지로 이동합니다.'), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('하단 네비 공고 탭을 누르면 채용 공고 목록으로 이동한다', (tester) async {
+    await _pumpRoute(tester, '/');
+
+    expect(find.text('홈 화면'), findsOneWidget);
+    await tester.tap(find.text('공고'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('채용 공고'), findsAtLeastNWidgets(1));
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('공고 화면 하단 네비 홈 탭을 누르면 홈으로 돌아간다', (tester) async {
+    await _pumpRoute(tester, '/jobs');
+
+    await tester.tap(find.text('홈'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('홈 화면'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('상세에서 북마크하면 북마크 화면에 표시된다', (tester) async {
     await _setViewport(tester);
     final router = _buildRouter(initialLocation: '/jobs/kepco-intern');
@@ -116,7 +155,16 @@ GoRouter _buildRouter({required String initialLocation}) => GoRouter(
   routes: [
     GoRoute(
       path: '/',
-      builder: (context, state) => const Scaffold(body: SizedBox()),
+      builder: (context, state) => Scaffold(
+        body: const Center(child: Text('홈 화면')),
+        bottomNavigationBar: SafeArea(
+          top: false,
+          child: AppBottomNavigation(
+            currentIndex: 0,
+            onTap: (index) => navigateToBottomTab(context, index),
+          ),
+        ),
+      ),
     ),
     GoRoute(
       path: '/applications',

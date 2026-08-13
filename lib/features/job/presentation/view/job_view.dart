@@ -69,9 +69,12 @@ class JobView extends ConsumerWidget {
           ],
         ),
       ),
-      bottomNavigationBar: const SafeArea(
+      bottomNavigationBar: SafeArea(
         top: false,
-        child: AppBottomNavigation(currentIndex: 1),
+        child: AppBottomNavigation(
+          currentIndex: 1,
+          onTap: (index) => navigateToBottomTab(context, index),
+        ),
       ),
     );
   }

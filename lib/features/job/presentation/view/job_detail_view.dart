@@ -431,6 +431,7 @@ class _JobDetailAction extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isSchool = job.source == JobSource.school;
+    final isClosed = job.isClosed;
     return SafeArea(
       top: false,
       child: Padding(
@@ -442,12 +443,17 @@ class _JobDetailAction extends StatelessWidget {
               height: 42.h,
               child: ElevatedButton(
                 key: const ValueKey('job-detail-apply'),
-                onPressed: () => _onApply(context, isSchool),
+                onPressed: isClosed ? null : () => _onApply(context, isSchool),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.primary,
                   foregroundColor: AppColors.onPrimary,
+                  disabledBackgroundColor: AppColors.background,
+                  disabledForegroundColor: AppColors.neutral600,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(8.r),
+                    side: isClosed
+                        ? const BorderSide(color: AppColors.neutral200)
+                        : BorderSide.none,
                   ),
                   padding: EdgeInsets.symmetric(
                     horizontal: 24.w,
@@ -455,9 +461,13 @@ class _JobDetailAction extends StatelessWidget {
                   ),
                 ),
                 child: Text(
-                  isSchool ? '지원서 작성하기' : '사이트에서 지원하기',
+                  isClosed
+                      ? '마감된 공고입니다'
+                      : (isSchool ? '지원서 작성하기' : '사이트에서 지원하기'),
                   style: AppTypography.label.copyWith(
-                    color: AppColors.onPrimary,
+                    color: isClosed
+                        ? AppColors.neutral600
+                        : AppColors.onPrimary,
                   ),
                 ),
               ),

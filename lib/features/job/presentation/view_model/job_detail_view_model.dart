@@ -46,7 +46,11 @@ class JobDetailViewState {
 class JobDetailViewModel extends _$JobDetailViewModel {
   @override
   JobDetailViewState build(String jobId) {
-    final job = mockJobs.where((job) => job.id == jobId).firstOrNull;
+    // 목록과 동일한 jobViewModelProvider의 jobs를 조회해, 목록에서 본 공고와
+    // 상세에서 찾는 공고가 서로 다른 소스로 갈라지지 않도록 합니다. 상세
+    // 전용 부가 정보(mockJobDetails)만 별도로 조회합니다.
+    final jobs = ref.watch(jobViewModelProvider).jobs;
+    final job = jobs.where((job) => job.id == jobId).firstOrNull;
     return JobDetailViewState(job: job, detail: mockJobDetails[jobId]);
   }
 }
