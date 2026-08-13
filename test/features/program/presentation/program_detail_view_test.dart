@@ -39,6 +39,23 @@ void main() {
     expect(find.byType(ProgramView), findsOneWidget);
   });
 
+  testWidgets('존재하지 않는 프로그램 id는 not-found 상태를 표시한다', (tester) async {
+    await _setViewport(tester);
+    await tester.pumpWidget(
+      const ProviderScope(
+        child: ScreenUtilInit(
+          designSize: Size(390, 844),
+          child: MaterialApp(
+            home: ProgramDetailView(programId: 'missing-program'),
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+
+    expect(find.text('프로그램 정보를 찾을 수 없습니다.'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
   test('서로 다른 Mock ID는 서로 다른 상세 데이터와 연결된다', () {
     final container = ProviderContainer();
     addTearDown(container.dispose);
@@ -53,6 +70,103 @@ void main() {
     expect(full.detail!.id, 'full');
     expect(full.detail!.title, '2026 하반기 취업 전략 설명회');
     expect(full.detail!.actionStatus, ProgramDetailActionStatus.full);
+  });
+
+  test('신청 처리 중에는 중복 신청을 실행하지 않고 완료 상태로 전환한다', () async {
+    final container = ProviderContainer();
+    addTearDown(container.dispose);
+    final subscription = container.listen(
+      programDetailViewModelProvider('available'),
+      (_, _) {},
+      fireImmediately: true,
+    );
+    addTearDown(subscription.close);
+    final notifier = container.read(
+      programDetailViewModelProvider('available').notifier,
+    );
+
+    final firstApplication = notifier.applyProgram();
+    expect(
+      container
+          .read(programDetailViewModelProvider('available'))
+          .detail!
+          .actionStatus,
+      ProgramDetailActionStatus.applying,
+    );
+
+    await notifier.applyProgram();
+    expect(
+      container
+          .read(programDetailViewModelProvider('available'))
+          .detail!
+          .actionStatus,
+      ProgramDetailActionStatus.applying,
+    );
+
+    await firstApplication;
+    expect(
+      container
+          .read(programDetailViewModelProvider('available'))
+          .detail!
+          .actionStatus,
+      ProgramDetailActionStatus.applied,
+    );
+  });
+
+  testWidgets('신청하기 Tap 후 처리 중 UI를 거쳐 신청 완료를 표시한다', (tester) async {
+    final router = _detailRouter();
+    addTearDown(router.dispose);
+    await _pumpDetailRouter(tester, router);
+
+    await tester.tap(find.text('신청하기'));
+    await tester.pump();
+
+    expect(find.text('신청을 처리 중입니다.'), findsOneWidget);
+    expect(find.text('잠시만 기다려 주세요.'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('program-applying-loading')),
+      findsOneWidget,
+    );
+
+    await tester.pump(const Duration(milliseconds: 700));
+    await tester.pump();
+    expect(find.text('신청 완료'), findsOneWidget);
+    expect(find.textContaining('취소'), findsNothing);
+  });
+
+  testWidgets('동시성 실패 문구와 확인 Action을 표시한다', (tester) async {
+    final router = _detailRouter();
+    addTearDown(router.dispose);
+    await _pumpDetailRouter(tester, router, concurrencyFailure: true);
+
+    await tester.tap(find.text('신청하기'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 700));
+    await tester.pump();
+
+    expect(find.text('정원이 마감되어 신청할 수 없어요.'), findsOneWidget);
+    expect(find.text('다른 프로그램을 확인해 주세요.'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('program-concurrency-confirm')),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('동시성 실패 확인은 Overlay를 닫고 신청 가능 상태로 돌아간다', (tester) async {
+    final router = _detailRouter();
+    addTearDown(router.dispose);
+    await _pumpDetailRouter(tester, router, concurrencyFailure: true);
+
+    await tester.tap(find.text('신청하기'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 700));
+    await tester.pump();
+    await tester.tap(find.byKey(const ValueKey('program-concurrency-confirm')));
+    await tester.pump();
+
+    expect(find.text('정원이 마감되어 신청할 수 없어요.'), findsNothing);
+    expect(find.text('신청하기'), findsOneWidget);
+    expect(find.textContaining('취소'), findsNothing);
   });
 
   final actionCases = <ProgramDetailActionStatus, String>{
@@ -102,10 +216,51 @@ GoRouter _router() => GoRouter(
   ],
 );
 
+GoRouter _detailRouter() => GoRouter(
+  initialLocation: '/programs/available',
+  routes: [
+    GoRoute(
+      path: '/programs',
+      builder: (_, _) => const ProgramView(),
+      routes: [
+        GoRoute(
+          path: ':programId',
+          builder: (_, state) =>
+              ProgramDetailView(programId: state.pathParameters['programId']!),
+        ),
+      ],
+    ),
+  ],
+);
+
 Future<void> _pumpRouter(WidgetTester tester, GoRouter router) async {
   await _setViewport(tester);
   await tester.pumpWidget(
     ProviderScope(
+      child: ScreenUtilInit(
+        designSize: const Size(390, 844),
+        child: MaterialApp.router(routerConfig: router),
+      ),
+    ),
+  );
+  await tester.pump();
+}
+
+Future<void> _pumpDetailRouter(
+  WidgetTester tester,
+  GoRouter router, {
+  bool concurrencyFailure = false,
+}) async {
+  await _setViewport(tester);
+  await tester.pumpWidget(
+    ProviderScope(
+      overrides: concurrencyFailure
+          ? [
+              programApplicationOutcomeProvider.overrideWithValue(
+                ProgramApplicationOutcome.concurrencyFailure,
+              ),
+            ]
+          : const [],
       child: ScreenUtilInit(
         designSize: const Size(390, 844),
         child: MaterialApp.router(routerConfig: router),

@@ -1,5 +1,8 @@
 import 'package:geti_app/features/application/presentation/view/application_view.dart';
 import 'package:geti_app/features/application/presentation/view/application_detail_view.dart';
+import 'package:geti_app/features/auth/presentation/view/login_view.dart';
+import 'package:geti_app/features/auth/presentation/view/profile_completion_guide_view.dart';
+import 'package:geti_app/features/auth/presentation/view/relogin_prompt_view.dart';
 import 'package:geti_app/features/job/presentation/view/job_bookmark_view.dart';
 import 'package:geti_app/features/job/presentation/view/job_detail_view.dart';
 import 'package:geti_app/features/job/presentation/view/job_view.dart';
@@ -14,11 +17,29 @@ part 'app_router.g.dart';
 @Riverpod(keepAlive: true)
 GoRouter appRouter(Ref ref) {
   final router = GoRouter(
+    initialLocation: '/login',
     routes: [
       GoRoute(
         path: '/',
         name: 'recommendation',
         builder: (context, state) => const RecommendationView(),
+      ),
+      GoRoute(
+        path: '/login',
+        name: 'login',
+        builder: (context, state) => const LoginView(),
+        routes: [
+          GoRoute(
+            path: 'profile-guide',
+            name: 'login-profile-guide',
+            builder: (context, state) => const ProfileCompletionGuideView(),
+          ),
+        ],
+      ),
+      GoRoute(
+        path: '/relogin',
+        name: 'relogin',
+        builder: (context, state) => const ReloginPromptView(),
       ),
       GoRoute(
         path: '/jobs',

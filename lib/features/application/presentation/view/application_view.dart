@@ -116,12 +116,9 @@ class ApplicationScreenBody extends StatelessWidget {
       separatorBuilder: (context, index) => SizedBox(height: 12.h),
       itemBuilder: (context, index) {
         final application = applications[index];
-        final detailId = application.detailId;
         return ApplicationCard(
           application: application,
-          onTap: detailId == null
-              ? null
-              : () => context.push('/applications/$detailId'),
+          onTap: () => context.push('/applications/${application.detailId}'),
         );
       },
     );

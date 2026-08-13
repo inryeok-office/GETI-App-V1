@@ -5,11 +5,41 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:geti_app/features/application/presentation/view/application_detail_view.dart';
 import 'package:geti_app/features/application/presentation/view/application_view.dart';
 import 'package:geti_app/features/application/presentation/view_model/application_detail_view_model.dart';
+import 'package:geti_app/features/application/presentation/view_model/application_view_model.dart';
 import 'package:geti_app/features/application/presentation/widgets/application_detail_state_content.dart';
 import 'package:go_router/go_router.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+
+  test('목록 상세 라우팅은 status가 아니라 ApplicationItem id를 사용한다', () {
+    const first = ApplicationItem(
+      id: 'first-submitted',
+      companyName: 'A',
+      positionName: 'Frontend',
+      status: ApplicationProgressStatus.submitted,
+      submittedDate: '2026.08.01',
+    );
+    const second = ApplicationItem(
+      id: 'second-submitted',
+      companyName: 'B',
+      positionName: 'Backend',
+      status: ApplicationProgressStatus.submitted,
+      submittedDate: '2026.08.02',
+    );
+
+    expect(first.detailId, 'first-submitted');
+    expect(second.detailId, 'second-submitted');
+  });
+
+  test('submitted 상세는 수정 보완 요청 notice를 표시하지 않는다', () {
+    final submitted = mockApplicationDetails['submitted'];
+
+    expect(submitted, isNotNull);
+    expect(submitted!.variant, ApplicationDetailVariant.submitted);
+    expect(submitted.noticeTitle, isNull);
+    expect(submitted.noticeDescription, isNull);
+  });
 
   final detailCases = <String, List<String>>{
     'revision': ['수정 요청', '수정·보완 요청', '웹에서 수정·재제출'],

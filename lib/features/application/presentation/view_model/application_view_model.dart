@@ -34,19 +34,7 @@ class ApplicationItem {
   final String submittedDate;
   final bool isDeleted;
 
-  String? get detailId {
-    if (isDeleted) return 'deleted';
-    return switch (status) {
-      ApplicationProgressStatus.submitted => 'submitted',
-      ApplicationProgressStatus.revisionRequested => 'revision',
-      ApplicationProgressStatus.cancelled => 'cancelled',
-      ApplicationProgressStatus.reviewing ||
-      ApplicationProgressStatus.interviewing ||
-      ApplicationProgressStatus.accepted ||
-      ApplicationProgressStatus.rejected ||
-      ApplicationProgressStatus.ended => null,
-    };
-  }
+  String get detailId => id;
 }
 
 class ApplicationViewState {
@@ -121,14 +109,14 @@ class ApplicationViewModel extends _$ApplicationViewModel {
 
 const mockApplications = [
   ApplicationItem(
-    id: 'reviewing',
+    id: 'submitted',
     companyName: '당근',
     positionName: '웹 프론트엔드 인턴',
     status: ApplicationProgressStatus.submitted,
     submittedDate: '2026.08.01',
   ),
   ApplicationItem(
-    id: 'interviewing',
+    id: 'reviewing',
     companyName: '토스페이먼츠',
     positionName: 'Frontend Developer',
     status: ApplicationProgressStatus.reviewing,
@@ -150,28 +138,28 @@ const mockApplications = [
     submittedDate: '2026.08.01',
   ),
   ApplicationItem(
-    id: 'accepted',
+    id: 'interviewing',
     companyName: '당근',
     positionName: '웹 프론트엔드 인턴',
     status: ApplicationProgressStatus.interviewing,
     submittedDate: '2026.08.01',
   ),
   ApplicationItem(
-    id: 'rejected',
+    id: 'accepted',
     companyName: '당근',
     positionName: '웹 프론트엔드 인턴',
     status: ApplicationProgressStatus.accepted,
     submittedDate: '2026.08.01',
   ),
   ApplicationItem(
-    id: 'submitted',
+    id: 'rejected',
     companyName: '당근',
     positionName: '웹 프론트엔드 인턴',
     status: ApplicationProgressStatus.rejected,
     submittedDate: '2026.08.01',
   ),
   ApplicationItem(
-    id: 'deleted',
+    id: 'ended',
     companyName: '네이버클라우드',
     positionName: '삭제된 공고',
     status: ApplicationProgressStatus.ended,

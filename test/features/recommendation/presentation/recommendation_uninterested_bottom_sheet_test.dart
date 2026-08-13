@@ -17,6 +17,7 @@ void main() {
 
     await tester.pumpWidget(const ProviderScope(child: GetiApp()));
     await tester.pumpAndSettle();
+    await _loginAndSettle(tester);
 
     await tester.tap(find.text('관심 없음').first);
     await tester.pumpAndSettle();
@@ -37,6 +38,7 @@ void main() {
 
     await tester.pumpWidget(const ProviderScope(child: GetiApp()));
     await tester.pumpAndSettle();
+    await _loginAndSettle(tester);
 
     expect(find.byKey(const ValueKey('bookmark-filled')), findsNothing);
 
@@ -80,6 +82,7 @@ void main() {
       UncontrolledProviderScope(container: container, child: const GetiApp()),
     );
     await tester.pump();
+    await _loginAndSettle(tester);
 
     expect(find.text('해제'), findsOneWidget);
     await tester.pump(const Duration(seconds: 1));
@@ -206,6 +209,12 @@ void main() {
       isFalse,
     );
   });
+}
+
+Future<void> _loginAndSettle(WidgetTester tester) async {
+  await tester.tap(find.text('교내 계정으로 로그인'));
+  await tester.pump(const Duration(milliseconds: 800));
+  await tester.pumpAndSettle();
 }
 
 const _job = RecommendationJob(
