@@ -22,7 +22,7 @@ void main() {
 
     expect(router.state.pathParameters['programId'], 'applied');
     expect(find.text('현직자와 함께하는 프론트엔드 특강'), findsOneWidget);
-    expect(find.text('신청 완료'), findsOneWidget);
+    expect(find.text('신청 취소'), findsOneWidget);
   });
 
   testWidgets('프로그램 상세 Back은 기존 프로그램 목록으로 돌아간다', (tester) async {
@@ -113,6 +113,47 @@ void main() {
     );
   });
 
+  test('신청 취소 처리 중에는 중복 취소를 실행하지 않고 완료 상태로 전환한다', () async {
+    final container = ProviderContainer();
+    addTearDown(container.dispose);
+    final subscription = container.listen(
+      programDetailViewModelProvider('applied'),
+      (_, _) {},
+      fireImmediately: true,
+    );
+    addTearDown(subscription.close);
+    final notifier = container.read(
+      programDetailViewModelProvider('applied').notifier,
+    );
+
+    final firstCancellation = notifier.cancelProgram();
+    expect(
+      container
+          .read(programDetailViewModelProvider('applied'))
+          .detail!
+          .actionStatus,
+      ProgramDetailActionStatus.cancelling,
+    );
+
+    await notifier.cancelProgram();
+    expect(
+      container
+          .read(programDetailViewModelProvider('applied'))
+          .detail!
+          .actionStatus,
+      ProgramDetailActionStatus.cancelling,
+    );
+
+    await firstCancellation;
+    expect(
+      container
+          .read(programDetailViewModelProvider('applied'))
+          .detail!
+          .actionStatus,
+      ProgramDetailActionStatus.cancelled,
+    );
+  });
+
   testWidgets('신청하기 Tap 후 처리 중 UI를 거쳐 신청 완료를 표시한다', (tester) async {
     final router = _detailRouter();
     addTearDown(router.dispose);
@@ -130,8 +171,124 @@ void main() {
 
     await tester.pump(const Duration(milliseconds: 700));
     await tester.pump();
-    expect(find.text('신청 완료'), findsOneWidget);
-    expect(find.textContaining('취소'), findsNothing);
+    expect(find.text('신청 취소'), findsOneWidget);
+  });
+
+  testWidgets('신청 취소 Tap은 확인 BottomSheet를 표시하고 계속 참여하기로 닫는다', (tester) async {
+    final router = _detailRouter(programId: 'applied');
+    addTearDown(router.dispose);
+    await _pumpDetailRouter(tester, router);
+
+    await tester.tap(
+      find.byKey(const ValueKey('program-detail-action-applied')),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('프로그램 신청을 취소할까요?'), findsOneWidget);
+    expect(find.text('취소 후 정원이 마감되면 다시 신청할 수 없습니다.'), findsOneWidget);
+    expect(find.text('유의사항'), findsOneWidget);
+    expect(find.text('프로그램 시작 2일 전까지 취소할 수 있습니다.'), findsOneWidget);
+    expect(find.text('프로그램 시작 이후에는 취소가 불가능합니다.'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('program-cancel-confirm')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('program-cancel-continue')),
+      findsOneWidget,
+    );
+
+    await tester.tap(find.byKey(const ValueKey('program-cancel-continue')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('프로그램 신청을 취소할까요?'), findsNothing);
+    expect(find.text('신청 취소'), findsOneWidget);
+  });
+
+  testWidgets('신청 취소 확인 BottomSheet는 빠른 중복 Tap에도 하나만 표시된다', (tester) async {
+    final router = _detailRouter(programId: 'applied');
+    addTearDown(router.dispose);
+    await _pumpDetailRouter(tester, router);
+
+    final cancelAction = find.byKey(
+      const ValueKey('program-detail-action-applied'),
+    );
+    await tester.tap(cancelAction);
+    await tester.tap(cancelAction, warnIfMissed: false);
+    await tester.pumpAndSettle();
+
+    expect(find.text('프로그램 신청을 취소할까요?'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('program-cancel-confirm')),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('신청 취소 성공은 처리 중 UI를 거쳐 완료 Dialog를 표시한다', (tester) async {
+    final router = _detailRouter(programId: 'applied');
+    addTearDown(router.dispose);
+    await _pumpDetailRouter(tester, router);
+
+    await tester.tap(
+      find.byKey(const ValueKey('program-detail-action-applied')),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('program-cancel-confirm')));
+    await tester.pump();
+
+    expect(find.text('신청 취소 처리 중입니다.'), findsOneWidget);
+    expect(find.text('잠시만 기다려 주세요.'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('program-cancelling-loading')),
+      findsOneWidget,
+    );
+
+    await tester.pump(const Duration(milliseconds: 700));
+    await tester.pump();
+
+    expect(find.text('신청이 취소되었습니다'), findsOneWidget);
+    expect(find.text('취소일'), findsOneWidget);
+    expect(find.text('2026.08.08 (금) 15:20'), findsOneWidget);
+    expect(find.text('취소 사유'), findsOneWidget);
+    expect(find.text('사용자 취소'), findsOneWidget);
+
+    await tester.tap(find.byKey(const ValueKey('program-cancel-go-programs')));
+    await tester.pumpAndSettle();
+
+    expect(router.state.uri.path, '/programs');
+  });
+
+  testWidgets('신청 취소 실패는 실패 Dialog와 재시도/닫기 Action을 표시한다', (tester) async {
+    final router = _detailRouter(programId: 'applied');
+    addTearDown(router.dispose);
+    await _pumpDetailRouter(tester, router, cancellationFailure: true);
+
+    await tester.tap(
+      find.byKey(const ValueKey('program-detail-action-applied')),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('program-cancel-confirm')));
+    await tester.pump(const Duration(milliseconds: 700));
+    await tester.pump();
+
+    expect(find.text('신청을 취소하지 못했어요'), findsOneWidget);
+    expect(find.text('사유'), findsOneWidget);
+    expect(find.text('이미 취소 가능한 기한이 지났거나\n다른 이유로 취소가 불가능합니다.'), findsOneWidget);
+    expect(find.byKey(const ValueKey('program-cancel-retry')), findsOneWidget);
+    expect(find.byKey(const ValueKey('program-cancel-close')), findsOneWidget);
+
+    await tester.tap(find.byKey(const ValueKey('program-cancel-retry')));
+    await tester.pump();
+
+    expect(find.text('신청 취소 처리 중입니다.'), findsOneWidget);
+
+    await tester.pump(const Duration(milliseconds: 700));
+    await tester.pump();
+    await tester.tap(find.byKey(const ValueKey('program-cancel-close')));
+    await tester.pump();
+
+    expect(find.text('신청을 취소하지 못했어요'), findsNothing);
+    expect(find.text('신청 취소'), findsOneWidget);
   });
 
   testWidgets('동시성 실패 문구와 확인 Action을 표시한다', (tester) async {
@@ -174,7 +331,10 @@ void main() {
     ProgramDetailActionStatus.upcoming: '모집 전입니다.',
     ProgramDetailActionStatus.full: '정원이 마감되었습니다.',
     ProgramDetailActionStatus.closed: '신청 기간이 종료되었습니다.',
-    ProgramDetailActionStatus.applied: '신청 완료',
+    ProgramDetailActionStatus.applied: '신청 취소',
+    ProgramDetailActionStatus.cancelling: '신청 취소',
+    ProgramDetailActionStatus.cancelled: '신청 취소 완료',
+    ProgramDetailActionStatus.cancelFailure: '신청 취소',
   };
 
   for (final actionCase in actionCases.entries) {
@@ -216,8 +376,8 @@ GoRouter _router() => GoRouter(
   ],
 );
 
-GoRouter _detailRouter() => GoRouter(
-  initialLocation: '/programs/available',
+GoRouter _detailRouter({String programId = 'available'}) => GoRouter(
+  initialLocation: '/programs/$programId',
   routes: [
     GoRoute(
       path: '/programs',
@@ -250,17 +410,21 @@ Future<void> _pumpDetailRouter(
   WidgetTester tester,
   GoRouter router, {
   bool concurrencyFailure = false,
+  bool cancellationFailure = false,
 }) async {
   await _setViewport(tester);
   await tester.pumpWidget(
     ProviderScope(
-      overrides: concurrencyFailure
-          ? [
-              programApplicationOutcomeProvider.overrideWithValue(
-                ProgramApplicationOutcome.concurrencyFailure,
-              ),
-            ]
-          : const [],
+      overrides: [
+        if (concurrencyFailure)
+          programApplicationOutcomeProvider.overrideWithValue(
+            ProgramApplicationOutcome.concurrencyFailure,
+          ),
+        if (cancellationFailure)
+          programCancellationOutcomeProvider.overrideWithValue(
+            ProgramCancellationOutcome.failure,
+          ),
+      ],
       child: ScreenUtilInit(
         designSize: const Size(390, 844),
         child: MaterialApp.router(routerConfig: router),

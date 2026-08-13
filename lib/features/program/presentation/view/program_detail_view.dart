@@ -8,15 +8,22 @@ import 'package:geti_app/shared/theme/app_colors.dart';
 import 'package:geti_app/shared/theme/app_typography.dart';
 import 'package:go_router/go_router.dart';
 
-class ProgramDetailView extends ConsumerWidget {
+class ProgramDetailView extends ConsumerStatefulWidget {
   const ProgramDetailView({required this.programId, super.key});
   final String programId;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final state = ref.watch(programDetailViewModelProvider(programId));
+  ConsumerState<ProgramDetailView> createState() => _ProgramDetailViewState();
+}
+
+class _ProgramDetailViewState extends ConsumerState<ProgramDetailView> {
+  bool _isCancelConfirmationOpen = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final state = ref.watch(programDetailViewModelProvider(widget.programId));
     final viewModel = ref.read(
-      programDetailViewModelProvider(programId).notifier,
+      programDetailViewModelProvider(widget.programId).notifier,
     );
     final detail = state.detail;
     if (detail == null) {
@@ -95,10 +102,23 @@ class ProgramDetailView extends ConsumerWidget {
           body: ProgramDetailBody(
             detail: detail,
             onApply: viewModel.applyProgram,
+            onCancel: () => _showCancelConfirmation(context, viewModel),
           ),
         ),
         if (detail.actionStatus == ProgramDetailActionStatus.applying)
           const ProgramApplyingOverlay(),
+        if (detail.actionStatus == ProgramDetailActionStatus.cancelling)
+          const ProgramCancellingOverlay(),
+        if (detail.actionStatus == ProgramDetailActionStatus.cancelled)
+          ProgramCancelSuccessOverlay(
+            detail: detail,
+            onGoToPrograms: () => context.go('/programs'),
+          ),
+        if (detail.actionStatus == ProgramDetailActionStatus.cancelFailure)
+          ProgramCancelFailureOverlay(
+            onRetry: viewModel.cancelProgram,
+            onClose: viewModel.closeCancelFailure,
+          ),
         if (detail.actionStatus == ProgramDetailActionStatus.concurrencyFailure)
           ProgramConcurrencyFailureOverlay(
             onConfirm: viewModel.confirmConcurrencyFailure,
@@ -106,12 +126,45 @@ class ProgramDetailView extends ConsumerWidget {
       ],
     );
   }
+
+  Future<void> _showCancelConfirmation(
+    BuildContext context,
+    ProgramDetailViewModel viewModel,
+  ) async {
+    if (_isCancelConfirmationOpen) return;
+
+    _isCancelConfirmationOpen = true;
+    try {
+      await showModalBottomSheet<void>(
+        context: context,
+        isScrollControlled: true,
+        useSafeArea: false,
+        backgroundColor: Colors.transparent,
+        barrierColor: const Color(0x40111111),
+        builder: (sheetContext) => ProgramCancelConfirmBottomSheet(
+          onCancel: () {
+            Navigator.of(sheetContext).pop();
+            viewModel.cancelProgram();
+          },
+          onContinue: () => Navigator.of(sheetContext).pop(),
+        ),
+      );
+    } finally {
+      _isCancelConfirmationOpen = false;
+    }
+  }
 }
 
 class ProgramDetailBody extends StatelessWidget {
-  const ProgramDetailBody({required this.detail, this.onApply, super.key});
+  const ProgramDetailBody({
+    required this.detail,
+    this.onApply,
+    this.onCancel,
+    super.key,
+  });
   final ProgramDetail detail;
   final VoidCallback? onApply;
+  final VoidCallback? onCancel;
 
   @override
   Widget build(BuildContext context) => Column(
@@ -144,22 +197,38 @@ class ProgramDetailBody extends StatelessWidget {
           ),
         ),
       ),
-      ProgramDetailAction(status: detail.actionStatus, onApply: onApply),
+      ProgramDetailAction(
+        status: detail.actionStatus,
+        onApply: onApply,
+        onCancel: onCancel,
+      ),
     ],
   );
 }
 
 class ProgramDetailAction extends StatelessWidget {
-  const ProgramDetailAction({required this.status, this.onApply, super.key});
+  const ProgramDetailAction({
+    required this.status,
+    this.onApply,
+    this.onCancel,
+    super.key,
+  });
   final ProgramDetailActionStatus status;
   final VoidCallback? onApply;
+  final VoidCallback? onCancel;
 
   @override
   Widget build(BuildContext context) {
-    final showsAvailableAction =
+    final showsPrimaryAction =
         status == ProgramDetailActionStatus.available ||
         status == ProgramDetailActionStatus.applying ||
         status == ProgramDetailActionStatus.concurrencyFailure;
+    final showsCancelAction =
+        status == ProgramDetailActionStatus.applied ||
+        status == ProgramDetailActionStatus.cancelling ||
+        status == ProgramDetailActionStatus.cancelled ||
+        status == ProgramDetailActionStatus.cancelFailure;
+    final isFilledAction = showsPrimaryAction || showsCancelAction;
     final label = switch (status) {
       ProgramDetailActionStatus.available => '신청하기',
       ProgramDetailActionStatus.applying => '신청하기',
@@ -167,7 +236,10 @@ class ProgramDetailAction extends StatelessWidget {
       ProgramDetailActionStatus.upcoming => '모집 전입니다.',
       ProgramDetailActionStatus.full => '정원이 마감되었습니다.',
       ProgramDetailActionStatus.closed => '신청 기간이 종료되었습니다.',
-      ProgramDetailActionStatus.applied => '신청 완료',
+      ProgramDetailActionStatus.applied => '신청 취소',
+      ProgramDetailActionStatus.cancelling => '신청 취소',
+      ProgramDetailActionStatus.cancelled => '신청 취소 완료',
+      ProgramDetailActionStatus.cancelFailure => '신청 취소',
     };
     return SafeArea(
       top: false,
@@ -175,21 +247,23 @@ class ProgramDetailAction extends StatelessWidget {
         padding: EdgeInsets.fromLTRB(32.w, 12.h, 32.w, 16.h),
         child: Material(
           key: ValueKey('program-detail-action-${status.name}'),
-          color: showsAvailableAction
-              ? AppColors.primary
+          color: isFilledAction
+              ? (showsCancelAction ? AppColors.error : AppColors.primary)
               : AppColors.background,
           borderRadius: BorderRadius.circular(8.r),
           clipBehavior: Clip.antiAlias,
           child: InkWell(
-            onTap: status == ProgramDetailActionStatus.available
-                ? onApply
-                : null,
+            onTap: switch (status) {
+              ProgramDetailActionStatus.available => onApply,
+              ProgramDetailActionStatus.applied => onCancel,
+              _ => null,
+            },
             child: Container(
               width: double.infinity,
               height: 42.h,
               alignment: Alignment.center,
               decoration: BoxDecoration(
-                border: showsAvailableAction
+                border: isFilledAction
                     ? null
                     : Border.all(color: AppColors.neutral200),
                 borderRadius: BorderRadius.circular(8.r),
@@ -197,7 +271,7 @@ class ProgramDetailAction extends StatelessWidget {
               child: Text(
                 label,
                 style: AppTypography.caption.copyWith(
-                  color: showsAvailableAction
+                  color: isFilledAction
                       ? AppColors.onPrimary
                       : AppColors.neutral600,
                 ),

@@ -10,6 +10,9 @@ enum ProgramDetailActionStatus {
   full,
   closed,
   applied,
+  cancelling,
+  cancelled,
+  cancelFailure,
 }
 
 enum ProgramApplicationOutcome { success, concurrencyFailure }
@@ -17,6 +20,13 @@ enum ProgramApplicationOutcome { success, concurrencyFailure }
 @riverpod
 ProgramApplicationOutcome programApplicationOutcome(Ref ref) {
   return ProgramApplicationOutcome.success;
+}
+
+enum ProgramCancellationOutcome { success, failure }
+
+@riverpod
+ProgramCancellationOutcome programCancellationOutcome(Ref ref) {
+  return ProgramCancellationOutcome.success;
 }
 
 class ProgramDetail {
@@ -36,6 +46,8 @@ class ProgramDetail {
     this.currentApplicants = '32명',
     this.remainingCapacity = '18명',
     this.admissionType = '선착순',
+    this.cancellationDate = '2026.08.08 (금) 15:20',
+    this.cancellationReason = '사용자 취소',
   });
 
   final String id;
@@ -53,6 +65,8 @@ class ProgramDetail {
   final String currentApplicants;
   final String remainingCapacity;
   final String admissionType;
+  final String cancellationDate;
+  final String cancellationReason;
 
   ProgramDetail copyWith({ProgramDetailActionStatus? actionStatus}) {
     return ProgramDetail(
@@ -71,6 +85,8 @@ class ProgramDetail {
       currentApplicants: currentApplicants,
       remainingCapacity: remainingCapacity,
       admissionType: admissionType,
+      cancellationDate: cancellationDate,
+      cancellationReason: cancellationReason,
     );
   }
 }
@@ -126,6 +142,51 @@ class ProgramDetailViewModel extends _$ProgramDetailViewModel {
       detail: detail!.copyWith(
         actionStatus: ProgramDetailActionStatus.available,
       ),
+    );
+  }
+
+  Future<void> cancelProgram() async {
+    final detail = state.detail;
+    if (detail == null ||
+        (detail.actionStatus != ProgramDetailActionStatus.applied &&
+            detail.actionStatus != ProgramDetailActionStatus.cancelFailure)) {
+      return;
+    }
+
+    state = state.copyWith(
+      detail: detail.copyWith(
+        actionStatus: ProgramDetailActionStatus.cancelling,
+      ),
+    );
+    await Future<void>.delayed(const Duration(milliseconds: 700));
+    if (!ref.mounted) return;
+
+    final currentDetail = state.detail;
+    if (currentDetail == null ||
+        currentDetail.actionStatus != ProgramDetailActionStatus.cancelling) {
+      return;
+    }
+
+    final outcome = ref.read(programCancellationOutcomeProvider);
+    state = state.copyWith(
+      detail: currentDetail.copyWith(
+        actionStatus: switch (outcome) {
+          ProgramCancellationOutcome.success =>
+            ProgramDetailActionStatus.cancelled,
+          ProgramCancellationOutcome.failure =>
+            ProgramDetailActionStatus.cancelFailure,
+        },
+      ),
+    );
+  }
+
+  void closeCancelFailure() {
+    final detail = state.detail;
+    if (detail?.actionStatus != ProgramDetailActionStatus.cancelFailure) {
+      return;
+    }
+    state = state.copyWith(
+      detail: detail!.copyWith(actionStatus: ProgramDetailActionStatus.applied),
     );
   }
 }
