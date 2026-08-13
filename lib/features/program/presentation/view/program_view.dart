@@ -32,9 +32,12 @@ class ProgramView extends ConsumerWidget {
           ],
         ),
       ),
-      bottomNavigationBar: const SafeArea(
+      bottomNavigationBar: SafeArea(
         top: false,
-        child: AppBottomNavigation(currentIndex: 0),
+        child: AppBottomNavigation(
+          currentIndex: 0,
+          onTap: (index) => navigateToBottomTab(context, index),
+        ),
       ),
     );
   }

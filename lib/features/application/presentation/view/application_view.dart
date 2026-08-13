@@ -34,9 +34,12 @@ class ApplicationView extends ConsumerWidget {
           ],
         ),
       ),
-      bottomNavigationBar: const SafeArea(
+      bottomNavigationBar: SafeArea(
         top: false,
-        child: AppBottomNavigation(currentIndex: 3),
+        child: AppBottomNavigation(
+          currentIndex: 3,
+          onTap: (index) => navigateToBottomTab(context, index),
+        ),
       ),
     );
   }
