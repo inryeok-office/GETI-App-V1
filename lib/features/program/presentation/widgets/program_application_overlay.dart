@@ -81,17 +81,19 @@ class ProgramCancelConfirmBottomSheet extends StatelessWidget {
             SizedBox(height: 24.h),
             const _CancelNoticeBox(),
             SizedBox(height: 24.h),
-            _SheetActionButton(
+            _ProgramOverlayButton(
               key: const ValueKey('program-cancel-confirm'),
               label: '신청 취소',
               filled: true,
               danger: true,
+              height: 44,
               onPressed: onCancel,
             ),
             SizedBox(height: 12.h),
-            _SheetActionButton(
+            _ProgramOverlayButton(
               key: const ValueKey('program-cancel-continue'),
               label: '계속 참여하기',
+              height: 44,
               onPressed: onContinue,
             ),
           ],
@@ -154,16 +156,16 @@ class ProgramCancelSuccessOverlay extends StatelessWidget {
           Text(
             '신청이 취소되었습니다',
             textAlign: TextAlign.center,
-            style: AppTypography.heading3.copyWith(
-              color: const Color(0xFF111827),
-            ),
+            style: AppTypography.heading3.copyWith(color: AppColors.neutral900),
           ),
           SizedBox(height: 16.h),
           _CancelResultBox(detail: detail),
           SizedBox(height: 16.h),
-          _DialogActionButton(
+          _ProgramOverlayButton(
             key: const ValueKey('program-cancel-go-programs'),
             label: '프로그램 목록으로',
+            filled: true,
+            textStyle: AppTypography.caption,
             onPressed: onGoToPrograms,
           ),
         ],
@@ -193,23 +195,23 @@ class ProgramCancelFailureOverlay extends StatelessWidget {
           Text(
             '신청을 취소하지 못했어요',
             textAlign: TextAlign.center,
-            style: AppTypography.heading3.copyWith(
-              color: const Color(0xFF111827),
-            ),
+            style: AppTypography.heading3.copyWith(color: AppColors.neutral900),
           ),
           SizedBox(height: 16.h),
           const _CancelErrorBox(),
           SizedBox(height: 16.h),
-          _DialogActionButton(
+          _ProgramOverlayButton(
             key: const ValueKey('program-cancel-retry'),
             label: '다시 시도',
+            filled: true,
+            textStyle: AppTypography.caption,
             onPressed: onRetry,
           ),
           SizedBox(height: 8.h),
-          _DialogActionButton(
+          _ProgramOverlayButton(
             key: const ValueKey('program-cancel-close'),
             label: '닫기',
-            filled: false,
+            textStyle: AppTypography.caption,
             onPressed: onClose,
           ),
         ],
@@ -252,22 +254,12 @@ class ProgramConcurrencyFailureOverlay extends StatelessWidget {
           SizedBox(
             width: double.infinity,
             height: 42.h,
-            child: Material(
-              color: AppColors.primary,
-              borderRadius: BorderRadius.circular(8.r),
-              child: InkWell(
-                key: const ValueKey('program-concurrency-confirm'),
-                onTap: onConfirm,
-                borderRadius: BorderRadius.circular(8.r),
-                child: Center(
-                  child: Text(
-                    '확인',
-                    style: AppTypography.caption.copyWith(
-                      color: AppColors.onPrimary,
-                    ),
-                  ),
-                ),
-              ),
+            child: _ProgramOverlayButton(
+              key: const ValueKey('program-concurrency-confirm'),
+              label: '확인',
+              filled: true,
+              textStyle: AppTypography.caption,
+              onPressed: onConfirm,
             ),
           ),
         ],
@@ -285,7 +277,7 @@ class _CancelNoticeBox extends StatelessWidget {
     padding: EdgeInsets.all(16.w),
     decoration: BoxDecoration(
       color: AppColors.surface,
-      border: Border.all(color: const Color(0xFF8CC8DA)),
+      border: Border.all(color: AppColors.primaryBorder),
       borderRadius: BorderRadius.circular(8.r),
     ),
     child: Column(
@@ -321,7 +313,7 @@ class _CancelResultBox extends StatelessWidget {
     padding: EdgeInsets.all(16.w),
     decoration: BoxDecoration(
       color: AppColors.surface,
-      border: Border.all(color: const Color(0xFFE5E7EB)),
+      border: Border.all(color: AppColors.neutral200),
       borderRadius: BorderRadius.circular(8.r),
     ),
     child: Column(
@@ -347,14 +339,14 @@ class _CancelResultRow extends StatelessWidget {
         width: 52.w,
         child: Text(
           label,
-          style: AppTypography.caption.copyWith(color: const Color(0xFF334155)),
+          style: AppTypography.caption.copyWith(color: AppColors.neutral600),
         ),
       ),
       SizedBox(width: 12.w),
       Expanded(
         child: Text(
           value,
-          style: AppTypography.caption.copyWith(color: const Color(0xFF334155)),
+          style: AppTypography.caption.copyWith(color: AppColors.neutral600),
         ),
       ),
     ],
@@ -370,7 +362,7 @@ class _CancelErrorBox extends StatelessWidget {
     padding: EdgeInsets.all(16.w),
     decoration: BoxDecoration(
       color: AppColors.surface,
-      border: Border.all(color: const Color(0xFFE5E7EB)),
+      border: Border.all(color: AppColors.neutral200),
       borderRadius: BorderRadius.circular(12.r),
     ),
     child: Column(
@@ -379,25 +371,27 @@ class _CancelErrorBox extends StatelessWidget {
         Text(
           '사유',
           style: AppTypography.captionMedium.copyWith(
-            color: const Color(0xFF334155),
+            color: AppColors.neutral600,
           ),
         ),
         SizedBox(height: 12.h),
         Text(
           '이미 취소 가능한 기한이 지났거나\n다른 이유로 취소가 불가능합니다.',
-          style: AppTypography.caption.copyWith(color: const Color(0xFF475569)),
+          style: AppTypography.caption.copyWith(color: AppColors.neutral600),
         ),
       ],
     ),
   );
 }
 
-class _SheetActionButton extends StatelessWidget {
-  const _SheetActionButton({
+class _ProgramOverlayButton extends StatelessWidget {
+  const _ProgramOverlayButton({
     required this.label,
     required this.onPressed,
     this.filled = false,
     this.danger = false,
+    this.height = 42,
+    this.textStyle,
     super.key,
   });
 
@@ -405,11 +399,13 @@ class _SheetActionButton extends StatelessWidget {
   final VoidCallback onPressed;
   final bool filled;
   final bool danger;
+  final double height;
+  final TextStyle? textStyle;
 
   @override
   Widget build(BuildContext context) => SizedBox(
     width: double.infinity,
-    height: 44.h,
+    height: height.h,
     child: Material(
       color: filled
           ? (danger ? AppColors.error : AppColors.primary)
@@ -426,47 +422,7 @@ class _SheetActionButton extends StatelessWidget {
           ),
           child: Text(
             label,
-            style: AppTypography.label.copyWith(
-              color: filled ? AppColors.onPrimary : AppColors.neutral900,
-            ),
-          ),
-        ),
-      ),
-    ),
-  );
-}
-
-class _DialogActionButton extends StatelessWidget {
-  const _DialogActionButton({
-    required this.label,
-    required this.onPressed,
-    this.filled = true,
-    super.key,
-  });
-
-  final String label;
-  final VoidCallback onPressed;
-  final bool filled;
-
-  @override
-  Widget build(BuildContext context) => SizedBox(
-    width: double.infinity,
-    height: 42.h,
-    child: Material(
-      color: filled ? AppColors.primary : AppColors.surface,
-      borderRadius: BorderRadius.circular(8.r),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: onPressed,
-        child: Container(
-          alignment: Alignment.center,
-          decoration: BoxDecoration(
-            border: filled ? null : Border.all(color: AppColors.neutral200),
-            borderRadius: BorderRadius.circular(8.r),
-          ),
-          child: Text(
-            label,
-            style: AppTypography.caption.copyWith(
+            style: (textStyle ?? AppTypography.label).copyWith(
               color: filled ? AppColors.onPrimary : AppColors.neutral900,
             ),
           ),

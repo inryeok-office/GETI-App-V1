@@ -205,6 +205,25 @@ void main() {
     expect(find.text('신청 취소'), findsOneWidget);
   });
 
+  testWidgets('신청 취소 확인 BottomSheet는 빠른 중복 Tap에도 하나만 표시된다', (tester) async {
+    final router = _detailRouter(programId: 'applied');
+    addTearDown(router.dispose);
+    await _pumpDetailRouter(tester, router);
+
+    final cancelAction = find.byKey(
+      const ValueKey('program-detail-action-applied'),
+    );
+    await tester.tap(cancelAction);
+    await tester.tap(cancelAction, warnIfMissed: false);
+    await tester.pumpAndSettle();
+
+    expect(find.text('프로그램 신청을 취소할까요?'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('program-cancel-confirm')),
+      findsOneWidget,
+    );
+  });
+
   testWidgets('신청 취소 성공은 처리 중 UI를 거쳐 완료 Dialog를 표시한다', (tester) async {
     final router = _detailRouter(programId: 'applied');
     addTearDown(router.dispose);

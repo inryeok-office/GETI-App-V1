@@ -8,15 +8,22 @@ import 'package:geti_app/shared/theme/app_colors.dart';
 import 'package:geti_app/shared/theme/app_typography.dart';
 import 'package:go_router/go_router.dart';
 
-class ProgramDetailView extends ConsumerWidget {
+class ProgramDetailView extends ConsumerStatefulWidget {
   const ProgramDetailView({required this.programId, super.key});
   final String programId;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final state = ref.watch(programDetailViewModelProvider(programId));
+  ConsumerState<ProgramDetailView> createState() => _ProgramDetailViewState();
+}
+
+class _ProgramDetailViewState extends ConsumerState<ProgramDetailView> {
+  bool _isCancelConfirmationOpen = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final state = ref.watch(programDetailViewModelProvider(widget.programId));
     final viewModel = ref.read(
-      programDetailViewModelProvider(programId).notifier,
+      programDetailViewModelProvider(widget.programId).notifier,
     );
     final detail = state.detail;
     if (detail == null) {
@@ -124,20 +131,27 @@ class ProgramDetailView extends ConsumerWidget {
     BuildContext context,
     ProgramDetailViewModel viewModel,
   ) async {
-    await showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      useSafeArea: false,
-      backgroundColor: Colors.transparent,
-      barrierColor: const Color(0x40111111),
-      builder: (sheetContext) => ProgramCancelConfirmBottomSheet(
-        onCancel: () {
-          Navigator.of(sheetContext).pop();
-          viewModel.cancelProgram();
-        },
-        onContinue: () => Navigator.of(sheetContext).pop(),
-      ),
-    );
+    if (_isCancelConfirmationOpen) return;
+
+    _isCancelConfirmationOpen = true;
+    try {
+      await showModalBottomSheet<void>(
+        context: context,
+        isScrollControlled: true,
+        useSafeArea: false,
+        backgroundColor: Colors.transparent,
+        barrierColor: const Color(0x40111111),
+        builder: (sheetContext) => ProgramCancelConfirmBottomSheet(
+          onCancel: () {
+            Navigator.of(sheetContext).pop();
+            viewModel.cancelProgram();
+          },
+          onContinue: () => Navigator.of(sheetContext).pop(),
+        ),
+      );
+    } finally {
+      _isCancelConfirmationOpen = false;
+    }
   }
 }
 
@@ -212,6 +226,7 @@ class ProgramDetailAction extends StatelessWidget {
     final showsCancelAction =
         status == ProgramDetailActionStatus.applied ||
         status == ProgramDetailActionStatus.cancelling ||
+        status == ProgramDetailActionStatus.cancelled ||
         status == ProgramDetailActionStatus.cancelFailure;
     final isFilledAction = showsPrimaryAction || showsCancelAction;
     final label = switch (status) {
