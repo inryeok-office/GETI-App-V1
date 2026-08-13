@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
@@ -104,19 +105,21 @@ class LoginView extends ConsumerWidget {
                 ),
                 // TODO(design): Figma에서 신규/기존 회원 분기 UI가 확정되면 제거하고
                 // 실제 인증 응답에 따라 자동 분기하도록 교체합니다.
-                TextButton(
-                  onPressed: isLoading
-                      ? null
-                      : () => viewModel.loginWithSchoolOAuth(
-                          asExistingMember: false,
-                        ),
-                  child: Text(
-                    '(Mock) 최초 로그인 시나리오로 보기',
-                    style: AppTypography.caption.copyWith(
-                      color: AppColors.neutral500,
+                // kDebugMode로 감싸 실제 사용자에게는 노출되지 않도록 합니다.
+                if (kDebugMode)
+                  TextButton(
+                    onPressed: isLoading
+                        ? null
+                        : () => viewModel.loginWithSchoolOAuth(
+                            asExistingMember: false,
+                          ),
+                    child: Text(
+                      '(Mock) 최초 로그인 시나리오로 보기',
+                      style: AppTypography.caption.copyWith(
+                        color: AppColors.neutral500,
+                      ),
                     ),
                   ),
-                ),
               ],
             ),
           ),

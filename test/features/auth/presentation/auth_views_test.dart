@@ -37,7 +37,36 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('프로필을 완성해 주세요'), findsOneWidget);
-    expect(find.text('Web에서 계속하기'), findsOneWidget);
+    expect(find.text('돌아가기'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('이전 로그인 시도의 결과가 남아있어도 새 시도는 stale navigation을 일으키지 않는다', (
+    tester,
+  ) async {
+    await _pumpRoute(tester, '/login');
+
+    // 최초 로그인 시나리오를 먼저 실행해 loginResult를 남긴다.
+    await tester.tap(find.text('(Mock) 최초 로그인 시나리오로 보기'));
+    await tester.pump(const Duration(milliseconds: 800));
+    await tester.pumpAndSettle();
+    expect(find.text('프로필을 완성해 주세요'), findsOneWidget);
+
+    // '돌아가기'(reset 호출) 없이 시스템 뒤로가기로만 이동해 stale
+    // loginResult가 authViewModelProvider에 남아있는 상황을 재현한다.
+    Navigator.of(tester.element(find.byType(ProfileCompletionGuideView))).pop();
+    await tester.pumpAndSettle();
+    expect(find.text('교내 계정으로 로그인'), findsOneWidget);
+
+    // 기존 회원으로 다시 로그인하면, loading 전환 시점에 stale
+    // loginResult 때문에 프로필 안내 화면으로 잘못 이동하면 안 된다.
+    await tester.tap(find.text('교내 계정으로 로그인'));
+    await tester.pump();
+    expect(find.text('프로필을 완성해 주세요'), findsNothing);
+
+    await tester.pump(const Duration(milliseconds: 800));
+    await tester.pumpAndSettle();
+    expect(find.text('맞춤 추천'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 

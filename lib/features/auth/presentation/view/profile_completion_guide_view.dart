@@ -60,8 +60,9 @@ class ProfileCompletionGuideView extends ConsumerWidget {
                   width: double.infinity,
                   height: 42.h,
                   child: ElevatedButton(
-                    // TODO: Student Web 프로필 보완 화면으로 이동하는 실제 딥링크/외부
-                    // 브라우저 연동은 별도 Issue에서 구현합니다.
+                    // Student Web 프로필 보완 화면으로 이동하는 실제 딥링크/외부
+                    // 브라우저 연동은 별도 Issue에서 구현합니다. 그 전까지는
+                    // 실제 동작(로그인 화면으로 복귀)에 맞는 문구를 사용합니다.
                     onPressed: () {
                       ref.read(authViewModelProvider.notifier).reset();
                       Navigator.of(context).pop();
@@ -78,7 +79,7 @@ class ProfileCompletionGuideView extends ConsumerWidget {
                       ),
                     ),
                     child: Text(
-                      'Web에서 계속하기',
+                      '돌아가기',
                       style: AppTypography.label.copyWith(
                         color: AppColors.onPrimary,
                       ),

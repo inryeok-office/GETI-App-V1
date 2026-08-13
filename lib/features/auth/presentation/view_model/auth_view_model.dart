@@ -33,7 +33,10 @@ class AuthViewModel extends _$AuthViewModel {
   /// [asExistingMember]로 기존 회원/최초 로그인 학생 분기를 확인할 수 있습니다.
   /// 실제 DG OAuth 연동, 토큰 저장은 별도 Issue에서 구현합니다.
   Future<void> loginWithSchoolOAuth({required bool asExistingMember}) async {
-    state = state.copyWith(screenStatus: AuthScreenStatus.loading);
+    // copyWith는 loginResult를 null로 되돌릴 수 없으므로, 이전 시도의
+    // loginResult가 남아 LoginView의 리스너가 stale navigation을 실행하지
+    // 않도록 새 상태를 직접 생성해 loginResult를 초기화합니다.
+    state = const AuthViewState(screenStatus: AuthScreenStatus.loading);
     await Future<void>.delayed(const Duration(milliseconds: 700));
     if (!ref.mounted) return;
     state = AuthViewState(
