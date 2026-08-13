@@ -39,6 +39,23 @@ void main() {
     expect(find.byType(ProgramView), findsOneWidget);
   });
 
+  testWidgets('존재하지 않는 프로그램 id는 not-found 상태를 표시한다', (tester) async {
+    await _setViewport(tester);
+    await tester.pumpWidget(
+      const ProviderScope(
+        child: ScreenUtilInit(
+          designSize: Size(390, 844),
+          child: MaterialApp(
+            home: ProgramDetailView(programId: 'missing-program'),
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+
+    expect(find.text('프로그램 정보를 찾을 수 없습니다.'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
   test('서로 다른 Mock ID는 서로 다른 상세 데이터와 연결된다', () {
     final container = ProviderContainer();
     addTearDown(container.dispose);

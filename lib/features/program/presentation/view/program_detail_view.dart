@@ -18,7 +18,46 @@ class ProgramDetailView extends ConsumerWidget {
     final viewModel = ref.read(
       programDetailViewModelProvider(programId).notifier,
     );
-    final detail = state.detail!;
+    final detail = state.detail;
+    if (detail == null) {
+      return Scaffold(
+        backgroundColor: AppColors.background,
+        appBar: AppBar(
+          toolbarHeight: 56.h,
+          elevation: 0,
+          scrolledUnderElevation: 0,
+          backgroundColor: AppColors.surface,
+          surfaceTintColor: AppColors.surface,
+          shape: const Border(bottom: BorderSide(color: AppColors.neutral200)),
+          leadingWidth: 52.w,
+          leading: IconButton(
+            key: const ValueKey('program-detail-back'),
+            onPressed: () {
+              if (context.canPop()) {
+                context.pop();
+              } else {
+                context.go('/programs');
+              }
+            },
+            icon: Icon(Icons.chevron_left, size: 28.w),
+            color: AppColors.neutral600,
+          ),
+          titleSpacing: 0,
+          title: Text(
+            '?꾨줈洹몃옩 ?곸꽭',
+            style: AppTypography.heading2.copyWith(color: AppColors.neutral900),
+          ),
+        ),
+        body: Center(
+          child: Text(
+            '프로그램 정보를 찾을 수 없습니다.',
+            style: AppTypography.bodyLarge.copyWith(
+              color: AppColors.neutral600,
+            ),
+          ),
+        ),
+      );
+    }
     return Stack(
       children: [
         Scaffold(

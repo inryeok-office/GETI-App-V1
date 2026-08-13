@@ -219,6 +219,11 @@ class _DetailSection extends StatelessWidget {
   ApplicationDetailVariant variant,
 ) {
   return switch (variant) {
+    ApplicationDetailVariant.reviewing => (
+      label: '검토 중',
+      backgroundColor: AppColors.primarySubtle,
+      textColor: AppColors.primaryDark,
+    ),
     ApplicationDetailVariant.revisionRequested => (
       label: '수정 요청',
       backgroundColor: AppColors.primarySubtle,
@@ -228,6 +233,21 @@ class _DetailSection extends StatelessWidget {
       label: '제출 완료',
       backgroundColor: AppColors.primarySubtle,
       textColor: AppColors.primaryDark,
+    ),
+    ApplicationDetailVariant.interviewing => (
+      label: '면접 진행',
+      backgroundColor: AppColors.warningBackground,
+      textColor: AppColors.warning,
+    ),
+    ApplicationDetailVariant.accepted => (
+      label: '합격',
+      backgroundColor: AppColors.primarySubtle,
+      textColor: AppColors.primaryDark,
+    ),
+    ApplicationDetailVariant.rejected => (
+      label: '불합격',
+      backgroundColor: AppColors.background,
+      textColor: AppColors.neutral600,
     ),
     ApplicationDetailVariant.cancelled => (
       label: '취소',
