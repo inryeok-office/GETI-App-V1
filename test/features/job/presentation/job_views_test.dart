@@ -95,6 +95,62 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('분석 완료 공고는 AI 분석 카드에 핵심 요약과 태그를 표시한다', (tester) async {
+    await _pumpRoute(tester, '/jobs/naver-cloud-intern');
+
+    expect(find.text('AI 공고 분석'), findsOneWidget);
+    expect(find.text('분석 완료'), findsOneWidget);
+    expect(
+      find.text('웹서비스 개발 경험과 JavaScript 기본 역량을 중요하게 보는 신입·고졸 지원 가능 인턴 공고입니다.'),
+      findsOneWidget,
+    );
+    expect(find.text('고졸 지원 가능'), findsOneWidget);
+    expect(find.text('보통'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('분석 대기 중인 공고는 대기 안내를 표시한다', (tester) async {
+    await _pumpRoute(tester, '/jobs/kepco-intern');
+
+    expect(find.text('분석 대기 중'), findsOneWidget);
+    expect(find.text('AI가 공고 내용을 분석하고 있습니다.'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('분석 정보가 부족한 공고는 안내만 표시하고 재시도 버튼이 없다', (tester) async {
+    await _pumpRoute(tester, '/jobs/gsw-portfolio');
+
+    expect(find.text('분석 정보 부족'), findsOneWidget);
+    expect(find.text('공고 내용이 부족하여 분석할 수 없습니다.'), findsOneWidget);
+    expect(find.byKey(const ValueKey('job-ai-analysis-retry')), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('분석 실패한 공고는 재시도로 재분석 후 완료 상태가 된다', (tester) async {
+    await _pumpRoute(tester, '/jobs/woowa-frontend');
+
+    expect(find.text('분석 실패'), findsOneWidget);
+    expect(find.text('AI 분석 중 문제가 발생했습니다.'), findsOneWidget);
+
+    await tester.ensureVisible(
+      find.byKey(const ValueKey('job-ai-analysis-retry')),
+    );
+    await tester.tap(find.byKey(const ValueKey('job-ai-analysis-retry')));
+    await tester.pump();
+    expect(find.text('재분석 중'), findsOneWidget);
+    expect(find.text('AI가 다시 분석하고 있습니다.'), findsOneWidget);
+
+    await tester.pump(const Duration(milliseconds: 800));
+    await tester.pumpAndSettle();
+
+    expect(find.text('분석 완료'), findsOneWidget);
+    expect(
+      find.text('프론트엔드 실무 경험과 TypeScript 활용 능력을 중요하게 보는 정규직 신입 공고입니다.'),
+      findsOneWidget,
+    );
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('하단 네비 공고 탭을 누르면 채용 공고 목록으로 이동한다', (tester) async {
     await _pumpRoute(tester, '/');
 

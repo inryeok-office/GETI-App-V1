@@ -48,7 +48,11 @@ class JobDetailView extends ConsumerWidget {
       ),
       body: job == null || detail == null
           ? const _JobNotFound()
-          : _JobDetailBody(job: job, detail: detail),
+          : _JobDetailBody(
+              job: job,
+              detail: detail,
+              aiAnalysis: state.aiAnalysis ?? detail.aiAnalysis,
+            ),
     );
   }
 }
@@ -80,9 +84,14 @@ class _JobNotFound extends StatelessWidget {
 }
 
 class _JobDetailBody extends ConsumerWidget {
-  const _JobDetailBody({required this.job, required this.detail});
+  const _JobDetailBody({
+    required this.job,
+    required this.detail,
+    required this.aiAnalysis,
+  });
   final JobItem job;
   final JobDetail detail;
+  final JobAiAnalysis aiAnalysis;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -124,6 +133,13 @@ class _JobDetailBody extends ConsumerWidget {
                     _HiringProcessSection(steps: detail.hiringProcess),
                     SizedBox(height: 24.h),
                     _JobApplicationInfoCard(job: job, detail: detail),
+                    SizedBox(height: 16.h),
+                    _AiAnalysisCard(
+                      analysis: aiAnalysis,
+                      onRetry: () => ref
+                          .read(jobDetailViewModelProvider(job.id).notifier)
+                          .retryAiAnalysis(),
+                    ),
                   ],
                 ),
               ),
@@ -411,6 +427,343 @@ class _JobApplicationInfoCard extends StatelessWidget {
             ),
         ],
       ),
+    );
+  }
+}
+
+class _AiAnalysisCard extends StatelessWidget {
+  const _AiAnalysisCard({required this.analysis, required this.onRetry});
+  final JobAiAnalysis analysis;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    final (
+      badgeLabel,
+      badgeBackground,
+      badgeForeground,
+    ) = switch (analysis.status) {
+      JobAiAnalysisStatus.completed => (
+        '분석 완료',
+        AppColors.primarySubtle,
+        AppColors.primary,
+      ),
+      JobAiAnalysisStatus.pending => (
+        '분석 대기 중',
+        AppColors.background,
+        AppColors.neutral600,
+      ),
+      JobAiAnalysisStatus.failed => (
+        '분석 실패',
+        AppColors.dangerBackground,
+        AppColors.error,
+      ),
+      JobAiAnalysisStatus.insufficientInfo => (
+        '분석 정보 부족',
+        AppColors.warningBackground,
+        AppColors.warning,
+      ),
+      JobAiAnalysisStatus.reanalyzing => (
+        '재분석 중',
+        AppColors.background,
+        AppColors.neutral600,
+      ),
+    };
+
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.all(16.w),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        border: Border.all(color: AppColors.neutral200),
+        borderRadius: BorderRadius.circular(16.r),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'AI 공고 분석',
+                style: AppTypography.heading3.copyWith(
+                  color: AppColors.neutral900,
+                ),
+              ),
+              Container(
+                padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 6.h),
+                decoration: BoxDecoration(
+                  color: badgeBackground,
+                  borderRadius: BorderRadius.circular(16.r),
+                ),
+                child: Text(
+                  badgeLabel,
+                  style: AppTypography.captionMedium.copyWith(
+                    color: badgeForeground,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          SizedBox(height: 8.h),
+          Text(
+            'AI 분석 결과는 참고용입니다.',
+            style: AppTypography.caption.copyWith(color: AppColors.neutral600),
+          ),
+          SizedBox(height: 16.h),
+          switch (analysis.status) {
+            JobAiAnalysisStatus.completed => _AiAnalysisCompleted(
+              analysis: analysis,
+            ),
+            JobAiAnalysisStatus.pending => const _AiAnalysisBanner(
+              background: AppColors.primarySurface,
+              rotating: false,
+              title: 'AI가 공고 내용을 분석하고 있습니다.',
+              subtitle: '잠시만 기다려주세요.',
+            ),
+            JobAiAnalysisStatus.reanalyzing => const _AiAnalysisBanner(
+              background: AppColors.primarySurface,
+              rotating: true,
+              title: 'AI가 다시 분석하고 있습니다.',
+              subtitle: '잠시만 기다려주세요.',
+            ),
+            JobAiAnalysisStatus.failed => _AiAnalysisBanner(
+              background: AppColors.dangerBackground,
+              rotating: false,
+              title: 'AI 분석 중 문제가 발생했습니다.',
+              subtitle: '다시 시도해주세요.',
+              actionLabel: '재시도',
+              onAction: onRetry,
+            ),
+            JobAiAnalysisStatus.insufficientInfo => const _AiAnalysisBanner(
+              background: AppColors.warningBackground,
+              rotating: false,
+              title: '공고 내용이 부족하여 분석할 수 없습니다.',
+              subtitle: '다른 공고를 확인해주세요.',
+            ),
+          },
+        ],
+      ),
+    );
+  }
+}
+
+class _AiAnalysisBanner extends StatefulWidget {
+  const _AiAnalysisBanner({
+    required this.background,
+    required this.rotating,
+    required this.title,
+    required this.subtitle,
+    this.actionLabel,
+    this.onAction,
+  });
+
+  final Color background;
+  final bool rotating;
+  final String title;
+  final String subtitle;
+  final String? actionLabel;
+  final VoidCallback? onAction;
+
+  @override
+  State<_AiAnalysisBanner> createState() => _AiAnalysisBannerState();
+}
+
+class _AiAnalysisBannerState extends State<_AiAnalysisBanner>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 900),
+    );
+    if (widget.rotating) {
+      _controller.repeat();
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final icon = SvgPicture.asset(
+      'assets/icons/alert_circle.svg',
+      width: 20.w,
+      height: 20.w,
+    );
+
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.all(12.w),
+      decoration: BoxDecoration(
+        color: widget.background,
+        borderRadius: BorderRadius.circular(8.r),
+      ),
+      child: Row(
+        children: [
+          widget.rotating
+              ? RotationTransition(turns: _controller, child: icon)
+              : icon,
+          SizedBox(width: 16.w),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  widget.title,
+                  style: AppTypography.label.copyWith(
+                    color: AppColors.neutral900,
+                  ),
+                ),
+                SizedBox(height: 4.h),
+                Text(
+                  widget.subtitle,
+                  style: AppTypography.caption.copyWith(
+                    color: AppColors.neutral600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          if (widget.actionLabel != null)
+            OutlinedButton(
+              key: const ValueKey('job-ai-analysis-retry'),
+              onPressed: widget.onAction,
+              style: OutlinedButton.styleFrom(
+                foregroundColor: AppColors.neutral600,
+                side: const BorderSide(color: AppColors.neutral200),
+                backgroundColor: AppColors.surface,
+                padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8.r),
+                ),
+              ),
+              child: Text(
+                widget.actionLabel!,
+                style: AppTypography.caption.copyWith(
+                  color: AppColors.neutral600,
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _AiAnalysisCompleted extends StatelessWidget {
+  const _AiAnalysisCompleted({required this.analysis});
+  final JobAiAnalysis analysis;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          padding: EdgeInsets.only(bottom: 24.h),
+          decoration: const BoxDecoration(
+            border: Border(bottom: BorderSide(color: AppColors.neutral200)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                '핵심 요약',
+                style: AppTypography.label.copyWith(
+                  color: AppColors.neutral900,
+                ),
+              ),
+              SizedBox(height: 8.h),
+              Text(
+                analysis.summary ?? '',
+                style: AppTypography.body.copyWith(color: AppColors.neutral600),
+              ),
+            ],
+          ),
+        ),
+        SizedBox(height: 16.h),
+        _AiAnalysisTagGroup(title: '필수 기술 및 도구', tags: analysis.requiredSkills),
+        SizedBox(height: 16.h),
+        _AiAnalysisTagGroup(
+          title: '우대 기술 및 경험',
+          tags: analysis.preferredSkills,
+        ),
+        SizedBox(height: 16.h),
+        _AiAnalysisTagGroup(
+          title: '지원 적합성',
+          tags: analysis.fitTags,
+          highlighted: true,
+        ),
+        if (analysis.difficulty != null) ...[
+          SizedBox(height: 16.h),
+          _AiAnalysisTagGroup(title: '난이도', tags: [analysis.difficulty!]),
+        ],
+      ],
+    );
+  }
+}
+
+class _AiAnalysisTagGroup extends StatelessWidget {
+  const _AiAnalysisTagGroup({
+    required this.title,
+    required this.tags,
+    this.highlighted = false,
+  });
+
+  final String title;
+  final List<String> tags;
+  final bool highlighted;
+
+  @override
+  Widget build(BuildContext context) {
+    if (tags.isEmpty) return const SizedBox.shrink();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          title,
+          style: AppTypography.label.copyWith(color: AppColors.neutral900),
+        ),
+        SizedBox(height: 12.h),
+        Wrap(
+          spacing: 12.w,
+          runSpacing: 8.h,
+          children: tags
+              .map(
+                (tag) => Container(
+                  padding: EdgeInsets.symmetric(
+                    horizontal: 12.w,
+                    vertical: 6.h,
+                  ),
+                  decoration: BoxDecoration(
+                    color: highlighted
+                        ? AppColors.primarySubtle
+                        : AppColors.background,
+                    borderRadius: BorderRadius.circular(16.r),
+                  ),
+                  child: Text(
+                    tag,
+                    style: AppTypography.captionMedium.copyWith(
+                      color: highlighted
+                          ? AppColors.primary
+                          : AppColors.neutral600,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              )
+              .toList(growable: false),
+        ),
+      ],
     );
   }
 }
