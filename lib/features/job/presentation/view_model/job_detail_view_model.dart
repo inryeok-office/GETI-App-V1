@@ -1,3 +1,4 @@
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:geti_app/features/job/presentation/view_model/job_view_model.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
@@ -88,9 +89,12 @@ class JobDetailViewModel extends _$JobDetailViewModel {
   @override
   JobDetailViewState build(String jobId) {
     // 목록과 동일한 jobViewModelProvider의 jobs를 조회해, 목록에서 본 공고와
-    // 상세에서 찾는 공고가 서로 다른 소스로 갈라지지 않도록 합니다. 상세
-    // 전용 부가 정보(mockJobDetails)만 별도로 조회합니다.
-    final jobs = ref.watch(jobViewModelProvider).jobs;
+    // 상세에서 찾는 공고가 서로 다른 소스로 갈라지지 않도록 합니다. jobs만
+    // select로 좁혀서 watch해, 북마크/검색어 등 jobs와 무관한 상태 변경으로
+    // build()가 다시 실행되어 재시도로 갱신한 aiAnalysis가 초기값으로
+    // 되돌아가는 것을 막습니다. 상세 전용 부가 정보(mockJobDetails)만
+    // 별도로 조회합니다.
+    final jobs = ref.watch(jobViewModelProvider.select((state) => state.jobs));
     final job = jobs.where((job) => job.id == jobId).firstOrNull;
     final detail = mockJobDetails[jobId];
     return JobDetailViewState(

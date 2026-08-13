@@ -581,8 +581,24 @@ class _AiAnalysisBannerState extends State<_AiAnalysisBanner>
       vsync: this,
       duration: const Duration(milliseconds: 900),
     );
+    _syncAnimation();
+  }
+
+  @override
+  void didUpdateWidget(covariant _AiAnalysisBanner oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.rotating != widget.rotating) {
+      _syncAnimation();
+    }
+  }
+
+  void _syncAnimation() {
     if (widget.rotating) {
       _controller.repeat();
+    } else {
+      _controller
+        ..stop()
+        ..value = 0;
     }
   }
 
@@ -610,7 +626,11 @@ class _AiAnalysisBannerState extends State<_AiAnalysisBanner>
       child: Row(
         children: [
           widget.rotating
-              ? RotationTransition(turns: _controller, child: icon)
+              ? RotationTransition(
+                  key: const ValueKey('job-ai-analysis-spinner'),
+                  turns: _controller,
+                  child: icon,
+                )
               : icon,
           SizedBox(width: 16.w),
           Expanded(

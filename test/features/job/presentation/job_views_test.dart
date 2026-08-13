@@ -151,6 +151,46 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('재분석 중에는 로딩 아이콘 회전 애니메이션이 실제로 재생된다', (tester) async {
+    await _pumpRoute(tester, '/jobs/woowa-frontend');
+
+    await tester.ensureVisible(
+      find.byKey(const ValueKey('job-ai-analysis-retry')),
+    );
+    await tester.tap(find.byKey(const ValueKey('job-ai-analysis-retry')));
+    await tester.pump();
+
+    final rotation = tester.widget<RotationTransition>(
+      find.byKey(const ValueKey('job-ai-analysis-spinner')),
+    );
+    final controller = rotation.turns as AnimationController;
+    expect(controller.isAnimating, isTrue);
+
+    await tester.pump(const Duration(milliseconds: 800));
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('북마크를 눌러도 재시도로 갱신된 AI 분석 결과가 초기화되지 않는다', (tester) async {
+    await _pumpRoute(tester, '/jobs/woowa-frontend');
+
+    await tester.ensureVisible(
+      find.byKey(const ValueKey('job-ai-analysis-retry')),
+    );
+    await tester.tap(find.byKey(const ValueKey('job-ai-analysis-retry')));
+    await tester.pump(const Duration(milliseconds: 800));
+    await tester.pumpAndSettle();
+    expect(find.text('분석 완료'), findsOneWidget);
+
+    await tester.tap(find.byKey(const ValueKey('job-detail-bookmark')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('북마크 해제하기'), findsOneWidget);
+    expect(find.text('분석 완료'), findsOneWidget);
+    expect(find.text('분석 실패'), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('하단 네비 공고 탭을 누르면 채용 공고 목록으로 이동한다', (tester) async {
     await _pumpRoute(tester, '/');
 
