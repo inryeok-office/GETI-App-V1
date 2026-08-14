@@ -167,43 +167,52 @@ class ProgramDetailBody extends StatelessWidget {
   final VoidCallback? onCancel;
 
   @override
-  Widget build(BuildContext context) => Column(
-    children: [
-      Expanded(
-        child: SingleChildScrollView(
-          padding: EdgeInsets.symmetric(vertical: 24.h),
-          child: Center(
-            child: SizedBox(
-              width: 326.w,
-              child: Column(
-                children: [
-                  ProgramDetailSummary(detail: detail),
-                  SizedBox(height: 12.h),
-                  ProgramDetailField(label: '일정', value: detail.schedule),
-                  SizedBox(height: 12.h),
-                  ProgramDetailField(label: '장소', value: detail.location),
-                  SizedBox(height: 12.h),
-                  ProgramDetailField(label: '정원', value: detail.capacity),
-                  SizedBox(height: 12.h),
-                  ProgramDetailField(
-                    label: '프로그램 설명',
-                    value: detail.description,
-                  ),
-                  SizedBox(height: 12.h),
-                  ProgramApplicationInfo(detail: detail),
-                ],
+  Widget build(BuildContext context) {
+    if (detail.actionStatus == ProgramDetailActionStatus.programCancelled) {
+      return ProgramCancelledDetailBody(detail: detail);
+    }
+    if (detail.actionStatus == ProgramDetailActionStatus.deleted) {
+      return ProgramDeletedDetailBody(detail: detail);
+    }
+
+    return Column(
+      children: [
+        Expanded(
+          child: SingleChildScrollView(
+            padding: EdgeInsets.symmetric(vertical: 24.h),
+            child: Center(
+              child: SizedBox(
+                width: 326.w,
+                child: Column(
+                  children: [
+                    ProgramDetailSummary(detail: detail),
+                    SizedBox(height: 12.h),
+                    ProgramDetailField(label: '일정', value: detail.schedule),
+                    SizedBox(height: 12.h),
+                    ProgramDetailField(label: '장소', value: detail.location),
+                    SizedBox(height: 12.h),
+                    ProgramDetailField(label: '정원', value: detail.capacity),
+                    SizedBox(height: 12.h),
+                    ProgramDetailField(
+                      label: '프로그램 설명',
+                      value: detail.description,
+                    ),
+                    SizedBox(height: 12.h),
+                    ProgramApplicationInfo(detail: detail),
+                  ],
+                ),
               ),
             ),
           ),
         ),
-      ),
-      ProgramDetailAction(
-        status: detail.actionStatus,
-        onApply: onApply,
-        onCancel: onCancel,
-      ),
-    ],
-  );
+        ProgramDetailAction(
+          status: detail.actionStatus,
+          onApply: onApply,
+          onCancel: onCancel,
+        ),
+      ],
+    );
+  }
 }
 
 class ProgramDetailAction extends StatelessWidget {
@@ -240,6 +249,8 @@ class ProgramDetailAction extends StatelessWidget {
       ProgramDetailActionStatus.cancelling => '신청 취소',
       ProgramDetailActionStatus.cancelled => '신청 취소 완료',
       ProgramDetailActionStatus.cancelFailure => '신청 취소',
+      ProgramDetailActionStatus.programCancelled => '프로그램 취소',
+      ProgramDetailActionStatus.deleted => '삭제된 프로그램',
     };
     return SafeArea(
       top: false,

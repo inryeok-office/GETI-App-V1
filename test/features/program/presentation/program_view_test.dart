@@ -10,7 +10,7 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   testWidgets('전체 목록과 홈 활성 상태를 표시한다', (tester) async {
     await _pumpView(tester);
-    expect(mockPrograms, hasLength(5));
+    expect(mockPrograms, hasLength(7));
     expect(find.byType(ProgramCard), findsWidgets);
     final home = tester.widget<Semantics>(
       find.byWidgetPredicate(
@@ -24,8 +24,10 @@ void main() {
     await _pumpView(tester);
     await tester.tap(find.byKey(const ValueKey('program-tab-applied')));
     await tester.pump();
-    expect(find.byType(ProgramCard), findsOneWidget);
-    expect(find.text('신청 완료'), findsOneWidget);
+    expect(mockPrograms.where((program) => program.isApplied), hasLength(3));
+    expect(find.byType(ProgramCard), findsNWidgets(3));
+    expect(find.text('신청 완료'), findsNWidgets(3));
+    expect(find.text('삭제된 프로그램입니다.'), findsOneWidget);
   });
   testWidgets('프로그램 없음 상태를 표시한다', (tester) async {
     await _pumpBody(tester, const ProgramViewState(programs: []));

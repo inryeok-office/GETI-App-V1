@@ -25,6 +25,30 @@ void main() {
     expect(find.text('신청 취소'), findsOneWidget);
   });
 
+  testWidgets('취소됨과 삭제됨 Mock 프로그램도 기존 상세 Route를 사용한다', (tester) async {
+    final router = _router();
+    addTearDown(router.dispose);
+    await _pumpRouter(tester, router);
+
+    await tester.tap(find.byType(ProgramCard).at(1));
+    await tester.pumpAndSettle();
+
+    expect(router.state.uri.path, '/programs/cancelled');
+    expect(find.text('프로그램 취소'), findsOneWidget);
+
+    await tester.tap(find.byKey(const ValueKey('program-detail-back')));
+    await tester.pumpAndSettle();
+
+    final deletedProgram = find.text('삭제된 프로그램입니다.');
+    await tester.ensureVisible(deletedProgram);
+    await tester.pumpAndSettle();
+    await tester.tap(deletedProgram);
+    await tester.pumpAndSettle();
+
+    expect(router.state.uri.path, '/programs/deleted');
+    expect(find.text('삭제된 프로그램입니다.'), findsOneWidget);
+  });
+
   testWidgets('프로그램 상세 Back은 기존 프로그램 목록으로 돌아간다', (tester) async {
     final router = _router();
     addTearDown(router.dispose);
@@ -56,6 +80,55 @@ void main() {
     expect(find.text('프로그램 정보를 찾을 수 없습니다.'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets('프로그램 취소됨 상태는 Figma 안내와 신청 이력을 표시한다', (tester) async {
+    final router = _detailRouter(programId: 'cancelled');
+    addTearDown(router.dispose);
+    await _pumpDetailRouter(tester, router);
+
+    expect(router.state.uri.path, '/programs/cancelled');
+    expect(find.text('프로그램 취소'), findsOneWidget);
+    expect(find.text('현직자와 함께하는 프론트엔드 특강'), findsOneWidget);
+    expect(find.text('신청 08.01–08.10   ·   조회수 128'), findsOneWidget);
+    expect(find.text('해당 프로그램은 운영 사정으로 취소되었습니다.'), findsOneWidget);
+    expect(find.text('취소 사유'), findsOneWidget);
+    expect(find.text('강사 사정으로 인해 프로그램이 취소되었습니다.'), findsOneWidget);
+    expect(find.text('이용에 불편을 드려 죄송합니다.'), findsOneWidget);
+    expect(find.text('신청일'), findsOneWidget);
+    expect(find.text('2026.08.01 14:32'), findsOneWidget);
+    expect(find.text('상태'), findsOneWidget);
+    expect(find.text('취소됨 (2026.08.05 10:30)'), findsOneWidget);
+    expect(find.text('※ 프로그램은 취소되었지만 신청 내역은 확인할 수 있습니다.'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('program-detail-action-programCancelled')),
+      findsNothing,
+    );
+    expect(find.byType(AppBottomNavigation), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('삭제된 프로그램 상태는 삭제 안내와 신청 이력을 표시한다', (tester) async {
+    final router = _detailRouter(programId: 'deleted');
+    addTearDown(router.dispose);
+    await _pumpDetailRouter(tester, router);
+
+    expect(router.state.uri.path, '/programs/deleted');
+    expect(find.text('삭제된 프로그램입니다.'), findsOneWidget);
+    expect(find.text('운영에 의해 해당 프로그램 정보가\n삭제되었습니다.'), findsOneWidget);
+    expect(find.text('신청일'), findsOneWidget);
+    expect(find.text('2026.08.01 14:32'), findsOneWidget);
+    expect(find.text('상태'), findsOneWidget);
+    expect(find.text('삭제됨 (2026.08.05 10:30)'), findsOneWidget);
+    expect(find.text('※ 프로그램은 삭제되었지만 신청 내역은 확인할 수 있습니다.'), findsOneWidget);
+    expect(find.text('프로그램 취소'), findsNothing);
+    expect(
+      find.byKey(const ValueKey('program-detail-action-deleted')),
+      findsNothing,
+    );
+    expect(find.byType(AppBottomNavigation), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
   test('서로 다른 Mock ID는 서로 다른 상세 데이터와 연결된다', () {
     final container = ProviderContainer();
     addTearDown(container.dispose);
@@ -70,6 +143,17 @@ void main() {
     expect(full.detail!.id, 'full');
     expect(full.detail!.title, '2026 하반기 취업 전략 설명회');
     expect(full.detail!.actionStatus, ProgramDetailActionStatus.full);
+    expect(
+      container
+          .read(programDetailViewModelProvider('cancelled'))
+          .detail!
+          .actionStatus,
+      ProgramDetailActionStatus.programCancelled,
+    );
+    expect(
+      container.read(programDetailViewModelProvider('deleted')).detail!.id,
+      'deleted',
+    );
   });
 
   test('신청 처리 중에는 중복 신청을 실행하지 않고 완료 상태로 전환한다', () async {

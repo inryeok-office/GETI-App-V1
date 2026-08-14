@@ -13,6 +13,8 @@ enum ProgramDetailActionStatus {
   cancelling,
   cancelled,
   cancelFailure,
+  programCancelled,
+  deleted,
 }
 
 enum ProgramApplicationOutcome { success, concurrencyFailure }
@@ -48,6 +50,9 @@ class ProgramDetail {
     this.admissionType = '선착순',
     this.cancellationDate = '2026.08.08 (금) 15:20',
     this.cancellationReason = '사용자 취소',
+    this.applicationSubmittedAt = '2026.08.01 14:32',
+    this.programStatusChangedAt = '2026.08.05 10:30',
+    this.programCancellationReason = '강사 사정으로 인해 프로그램이 취소되었습니다.',
   });
 
   final String id;
@@ -67,6 +72,9 @@ class ProgramDetail {
   final String admissionType;
   final String cancellationDate;
   final String cancellationReason;
+  final String applicationSubmittedAt;
+  final String programStatusChangedAt;
+  final String programCancellationReason;
 
   ProgramDetail copyWith({ProgramDetailActionStatus? actionStatus}) {
     return ProgramDetail(
@@ -87,6 +95,9 @@ class ProgramDetail {
       admissionType: admissionType,
       cancellationDate: cancellationDate,
       cancellationReason: cancellationReason,
+      applicationSubmittedAt: applicationSubmittedAt,
+      programStatusChangedAt: programStatusChangedAt,
+      programCancellationReason: programCancellationReason,
     );
   }
 }
@@ -216,5 +227,15 @@ const mockProgramDetails = <String, ProgramDetail>{
     id: 'applied',
     title: '현직자와 함께하는 프론트엔드 특강',
     actionStatus: ProgramDetailActionStatus.applied,
+  ),
+  'cancelled': ProgramDetail(
+    id: 'cancelled',
+    title: '현직자와 함께하는 프론트엔드 특강',
+    actionStatus: ProgramDetailActionStatus.programCancelled,
+  ),
+  'deleted': ProgramDetail(
+    id: 'deleted',
+    title: '삭제된 프로그램입니다.',
+    actionStatus: ProgramDetailActionStatus.deleted,
   ),
 };
