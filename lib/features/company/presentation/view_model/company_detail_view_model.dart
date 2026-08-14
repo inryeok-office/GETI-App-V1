@@ -45,7 +45,7 @@ class CompanyDetailViewModel extends _$CompanyDetailViewModel {
         ? const <JobItem>[]
         : ref
               .watch(jobViewModelProvider.select((state) => state.jobs))
-              .where((job) => job.companyName == company.name)
+              .where((job) => job.companyName == company.name && !job.isClosed)
               .toList(growable: false);
     return CompanyDetailViewState(
       company: company,
