@@ -1,7 +1,36 @@
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:geti_app/features/job/presentation/view_model/job_view_model.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 part 'job_detail_view_model.g.dart';
+
+enum JobAiAnalysisStatus {
+  completed,
+  pending,
+  failed,
+  insufficientInfo,
+  reanalyzing,
+}
+
+class JobAiAnalysis {
+  const JobAiAnalysis({
+    required this.status,
+    this.summary,
+    this.requiredSkills = const [],
+    this.preferredSkills = const [],
+    this.fitTags = const [],
+    this.difficulty,
+  });
+
+  final JobAiAnalysisStatus status;
+
+  /// 아래 필드는 [status]가 [JobAiAnalysisStatus.completed]일 때만 채워집니다.
+  final String? summary;
+  final List<String> requiredSkills;
+  final List<String> preferredSkills;
+  final List<String> fitTags;
+  final String? difficulty;
+}
 
 class JobDetail {
   const JobDetail({
@@ -13,6 +42,7 @@ class JobDetail {
     required this.preferredQualifications,
     required this.workConditions,
     required this.hiringProcess,
+    required this.aiAnalysis,
     this.sourceName,
     this.externalUrl,
     this.targetAudience,
@@ -26,6 +56,7 @@ class JobDetail {
   final List<String> preferredQualifications;
   final List<String> workConditions;
   final List<String> hiringProcess;
+  final JobAiAnalysis aiAnalysis;
 
   /// 외부 공고에서만 사용됩니다.
   final String? sourceName;
@@ -36,10 +67,21 @@ class JobDetail {
 }
 
 class JobDetailViewState {
-  const JobDetailViewState({this.job, this.detail});
+  const JobDetailViewState({this.job, this.detail, this.aiAnalysis});
 
   final JobItem? job;
   final JobDetail? detail;
+  final JobAiAnalysis? aiAnalysis;
+
+  JobDetailViewState copyWith({
+    JobItem? job,
+    JobDetail? detail,
+    JobAiAnalysis? aiAnalysis,
+  }) => JobDetailViewState(
+    job: job ?? this.job,
+    detail: detail ?? this.detail,
+    aiAnalysis: aiAnalysis ?? this.aiAnalysis,
+  );
 }
 
 @riverpod
@@ -47,11 +89,32 @@ class JobDetailViewModel extends _$JobDetailViewModel {
   @override
   JobDetailViewState build(String jobId) {
     // 목록과 동일한 jobViewModelProvider의 jobs를 조회해, 목록에서 본 공고와
-    // 상세에서 찾는 공고가 서로 다른 소스로 갈라지지 않도록 합니다. 상세
-    // 전용 부가 정보(mockJobDetails)만 별도로 조회합니다.
-    final jobs = ref.watch(jobViewModelProvider).jobs;
+    // 상세에서 찾는 공고가 서로 다른 소스로 갈라지지 않도록 합니다. jobs만
+    // select로 좁혀서 watch해, 북마크/검색어 등 jobs와 무관한 상태 변경으로
+    // build()가 다시 실행되어 재시도로 갱신한 aiAnalysis가 초기값으로
+    // 되돌아가는 것을 막습니다. 상세 전용 부가 정보(mockJobDetails)만
+    // 별도로 조회합니다.
+    final jobs = ref.watch(jobViewModelProvider.select((state) => state.jobs));
     final job = jobs.where((job) => job.id == jobId).firstOrNull;
-    return JobDetailViewState(job: job, detail: mockJobDetails[jobId]);
+    final detail = mockJobDetails[jobId];
+    return JobDetailViewState(
+      job: job,
+      detail: detail,
+      aiAnalysis: detail?.aiAnalysis,
+    );
+  }
+
+  /// AI 분석 실패 상태에서 재시도를 흉내내는 Mock 동작입니다.
+  /// 실제 AI 분석 API 연동은 별도 Issue에서 구현합니다.
+  Future<void> retryAiAnalysis() async {
+    state = state.copyWith(
+      aiAnalysis: const JobAiAnalysis(status: JobAiAnalysisStatus.reanalyzing),
+    );
+    await Future<void>.delayed(const Duration(milliseconds: 800));
+    if (!ref.mounted) return;
+    state = state.copyWith(
+      aiAnalysis: mockRetriedAiAnalysis[jobId] ?? state.aiAnalysis,
+    );
   }
 }
 
@@ -70,6 +133,7 @@ const mockJobDetails = <String, JobDetail>{
       '모집 기간: 2026.07.20 ~ 2026.08.14',
     ],
     hiringProcess: ['서류 심사', '면접', '최종 합격'],
+    aiAnalysis: JobAiAnalysis(status: JobAiAnalysisStatus.pending),
   ),
   'naver-cloud-intern': JobDetail(
     recruitmentPeriod: '2026.07.20 ~ 2026.08.20',
@@ -95,6 +159,14 @@ const mockJobDetails = <String, JobDetail>{
       '모집 기간: 2026.07.20 ~ 2026.08.20',
     ],
     hiringProcess: ['서류 심사', '면접', '최종 합격'],
+    aiAnalysis: JobAiAnalysis(
+      status: JobAiAnalysisStatus.completed,
+      summary: '웹서비스 개발 경험과 JavaScript 기본 역량을 중요하게 보는 신입·고졸 지원 가능 인턴 공고입니다.',
+      requiredSkills: ['JavaScript', 'Git', '웹 기본 지식'],
+      preferredSkills: ['React', 'Next.js', 'AI API'],
+      fitTags: ['고졸 지원 가능', '신입 지원 가능'],
+      difficulty: '보통',
+    ),
   ),
   'woowa-frontend': JobDetail(
     recruitmentPeriod: '2026.07.01 ~ 2026.08.14',
@@ -111,6 +183,7 @@ const mockJobDetails = <String, JobDetail>{
       '모집 기간: 2026.07.01 ~ 2026.08.14',
     ],
     hiringProcess: ['서류 심사', '코딩 테스트', '면접'],
+    aiAnalysis: JobAiAnalysis(status: JobAiAnalysisStatus.failed),
   ),
   'gsw-portfolio': JobDetail(
     recruitmentPeriod: '2026.07.15 ~ 2026.08.31',
@@ -126,5 +199,18 @@ const mockJobDetails = <String, JobDetail>{
       '모집 기간: 2026.07.15 ~ 2026.08.31',
     ],
     hiringProcess: ['서류 심사', '포트폴리오 심사', '면접', '최종 합격'],
+    aiAnalysis: JobAiAnalysis(status: JobAiAnalysisStatus.insufficientInfo),
+  ),
+};
+
+/// 분석 실패 공고를 재시도했을 때 도달하는 Mock 결과입니다.
+const mockRetriedAiAnalysis = <String, JobAiAnalysis>{
+  'woowa-frontend': JobAiAnalysis(
+    status: JobAiAnalysisStatus.completed,
+    summary: '프론트엔드 실무 경험과 TypeScript 활용 능력을 중요하게 보는 정규직 신입 공고입니다.',
+    requiredSkills: ['HTML/CSS', 'JavaScript', '웹 프론트엔드 개발 경험'],
+    preferredSkills: ['TypeScript', 'React'],
+    fitTags: ['신입 지원 가능'],
+    difficulty: '어려움',
   ),
 };
