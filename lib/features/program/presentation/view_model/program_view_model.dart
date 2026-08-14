@@ -5,7 +5,14 @@ enum ProgramScreenStatus { loaded, loading, networkError }
 
 enum ProgramTab { all, applied }
 
-enum ProgramRecruitmentStatus { recruiting, full, upcoming, closed }
+enum ProgramRecruitmentStatus {
+  recruiting,
+  full,
+  upcoming,
+  closed,
+  cancelled,
+  deleted,
+}
 
 class ProgramItem {
   const ProgramItem({
@@ -72,6 +79,24 @@ const mockPrograms = [
     location: '광주소프트웨어마이스터고 시청각실',
     applicationPeriod: '2026.07.20 – 2026.08.10',
     status: ProgramRecruitmentStatus.recruiting,
+    isApplied: true,
+  ),
+  ProgramItem(
+    id: 'cancelled',
+    title: '현직자와 함께하는 프론트엔드 특강',
+    schedule: '08.12 14:00–16:00',
+    location: '광주소프트웨어마이스터고 시청각실',
+    applicationPeriod: '2026.07.20 – 2026.08.10',
+    status: ProgramRecruitmentStatus.cancelled,
+    isApplied: true,
+  ),
+  ProgramItem(
+    id: 'deleted',
+    title: '삭제된 프로그램입니다.',
+    schedule: '08.12 14:00–16:00',
+    location: '광주소프트웨어마이스터고 시청각실',
+    applicationPeriod: '2026.07.20 – 2026.08.10',
+    status: ProgramRecruitmentStatus.deleted,
     isApplied: true,
   ),
   ProgramItem(

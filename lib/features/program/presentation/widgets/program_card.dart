@@ -11,10 +11,12 @@ class ProgramCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final badge = switch (program.status) {
-      ProgramRecruitmentStatus.recruiting => ('모집 중', true),
-      ProgramRecruitmentStatus.full => ('정원 마감', true),
-      ProgramRecruitmentStatus.upcoming => ('모집 예정', false),
-      ProgramRecruitmentStatus.closed => ('신청기간 종료', false),
+      ProgramRecruitmentStatus.recruiting => ('모집 중', _BadgeTone.brand),
+      ProgramRecruitmentStatus.full => ('정원 마감', _BadgeTone.brand),
+      ProgramRecruitmentStatus.upcoming => ('모집 예정', _BadgeTone.neutral),
+      ProgramRecruitmentStatus.closed => ('신청기간 종료', _BadgeTone.neutral),
+      ProgramRecruitmentStatus.cancelled => ('프로그램 취소', _BadgeTone.danger),
+      ProgramRecruitmentStatus.deleted => ('삭제됨', _BadgeTone.neutral),
     };
     return Material(
       color: AppColors.surface,
@@ -34,9 +36,9 @@ class ProgramCard extends StatelessWidget {
                 spacing: 8.w,
                 runSpacing: 8.h,
                 children: [
-                  _Badge(label: badge.$1, isBrand: badge.$2),
+                  _Badge(label: badge.$1, tone: badge.$2),
                   if (program.isApplied)
-                    const _Badge(label: '신청 완료', isBrand: true),
+                    const _Badge(label: '신청 완료', tone: _BadgeTone.brand),
                 ],
               ),
               SizedBox(height: 8.h),
@@ -92,22 +94,31 @@ class ProgramCard extends StatelessWidget {
   }
 }
 
+enum _BadgeTone { brand, neutral, danger }
+
 class _Badge extends StatelessWidget {
-  const _Badge({required this.label, required this.isBrand});
+  const _Badge({required this.label, required this.tone});
   final String label;
-  final bool isBrand;
+  final _BadgeTone tone;
+
   @override
-  Widget build(BuildContext context) => Container(
-    padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h),
-    decoration: BoxDecoration(
-      color: isBrand ? AppColors.primarySubtle : AppColors.background,
-      borderRadius: BorderRadius.circular(16.r),
-    ),
-    child: Text(
-      label,
-      style: AppTypography.captionMedium.copyWith(
-        color: isBrand ? AppColors.primary : AppColors.neutral600,
+  Widget build(BuildContext context) {
+    final colors = switch (tone) {
+      _BadgeTone.brand => (AppColors.primarySubtle, AppColors.primary),
+      _BadgeTone.neutral => (AppColors.background, AppColors.neutral600),
+      _BadgeTone.danger => (AppColors.dangerBackground, AppColors.error),
+    };
+
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h),
+      decoration: BoxDecoration(
+        color: colors.$1,
+        borderRadius: BorderRadius.circular(16.r),
       ),
-    ),
-  );
+      child: Text(
+        label,
+        style: AppTypography.captionMedium.copyWith(color: colors.$2),
+      ),
+    );
+  }
 }
