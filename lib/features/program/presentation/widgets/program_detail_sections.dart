@@ -100,31 +100,34 @@ class ProgramCancelledDetailBody extends StatelessWidget {
   final ProgramDetail detail;
 
   @override
-  Widget build(BuildContext context) => SingleChildScrollView(
-    padding: EdgeInsets.symmetric(vertical: 16.h),
-    child: Center(
-      child: SizedBox(
-        width: 326.w,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _CancelledProgramSummary(detail: detail),
-            SizedBox(height: 12.h),
-            _ProgramCancellationAlert(detail: detail),
-            SizedBox(height: 12.h),
-            _ProgramStatusHistory(
-              applicationSubmittedAt: detail.applicationSubmittedAt,
-              statusText: '취소됨 (${detail.programStatusChangedAt})',
-              gap: 8.h,
-            ),
-            SizedBox(height: 12.h),
-            Text(
-              '※ 프로그램은 취소되었지만 신청 내역은 확인할 수 있습니다.',
-              style: AppTypography.caption.copyWith(
-                color: AppColors.neutral600,
+  Widget build(BuildContext context) => SafeArea(
+    top: false,
+    child: SingleChildScrollView(
+      padding: EdgeInsets.symmetric(vertical: 16.h),
+      child: Center(
+        child: SizedBox(
+          width: 326.w,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _CancelledProgramSummary(detail: detail),
+              SizedBox(height: 12.h),
+              _ProgramCancellationAlert(detail: detail),
+              SizedBox(height: 12.h),
+              _ProgramStatusHistory(
+                applicationSubmittedAt: detail.applicationSubmittedAt,
+                statusText: '취소됨 (${detail.programStatusChangedAt})',
+                gap: 8.h,
               ),
-            ),
-          ],
+              SizedBox(height: 12.h),
+              Text(
+                '※ 프로그램은 취소되었지만 신청 내역은 확인할 수 있습니다.',
+                style: AppTypography.caption.copyWith(
+                  color: AppColors.neutral600,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     ),
@@ -136,41 +139,44 @@ class ProgramDeletedDetailBody extends StatelessWidget {
   final ProgramDetail detail;
 
   @override
-  Widget build(BuildContext context) => SingleChildScrollView(
-    padding: EdgeInsets.only(top: 56.h, bottom: 16.h),
-    child: Center(
-      child: SizedBox(
-        width: 326.w,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text(
-              '삭제된 프로그램입니다.',
-              textAlign: TextAlign.center,
-              style: AppTypography.heading2.copyWith(
-                color: AppColors.neutral900,
+  Widget build(BuildContext context) => SafeArea(
+    top: false,
+    child: SingleChildScrollView(
+      padding: EdgeInsets.only(top: 56.h, bottom: 16.h),
+      child: Center(
+        child: SizedBox(
+          width: 326.w,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                '삭제된 프로그램입니다.',
+                textAlign: TextAlign.center,
+                style: AppTypography.heading2.copyWith(
+                  color: AppColors.neutral900,
+                ),
               ),
-            ),
-            SizedBox(height: 20.h),
-            Text(
-              '운영에 의해 해당 프로그램 정보가\n삭제되었습니다.',
-              textAlign: TextAlign.center,
-              style: AppTypography.body.copyWith(color: AppColors.neutral600),
-            ),
-            SizedBox(height: 20.h),
-            _ProgramStatusHistory(
-              applicationSubmittedAt: detail.applicationSubmittedAt,
-              statusText: '삭제됨 (${detail.programStatusChangedAt})',
-              gap: 12.h,
-            ),
-            SizedBox(height: 20.h),
-            Text(
-              '※ 프로그램은 삭제되었지만 신청 내역은 확인할 수 있습니다.',
-              style: AppTypography.caption.copyWith(
-                color: AppColors.neutral600,
+              SizedBox(height: 20.h),
+              Text(
+                '운영에 의해 해당 프로그램 정보가\n삭제되었습니다.',
+                textAlign: TextAlign.center,
+                style: AppTypography.body.copyWith(color: AppColors.neutral600),
               ),
-            ),
-          ],
+              SizedBox(height: 20.h),
+              _ProgramStatusHistory(
+                applicationSubmittedAt: detail.applicationSubmittedAt,
+                statusText: '삭제됨 (${detail.programStatusChangedAt})',
+                gap: 12.h,
+              ),
+              SizedBox(height: 20.h),
+              Text(
+                '※ 프로그램은 삭제되었지만 신청 내역은 확인할 수 있습니다.',
+                style: AppTypography.caption.copyWith(
+                  color: AppColors.neutral600,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     ),

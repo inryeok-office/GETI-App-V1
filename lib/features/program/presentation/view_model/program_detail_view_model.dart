@@ -13,9 +13,9 @@ enum ProgramDetailActionStatus {
   cancelling,
   cancelled,
   cancelFailure,
-  programCancelled,
-  deleted,
 }
+
+enum ProgramOperationalStatus { active, cancelled, deleted }
 
 enum ProgramApplicationOutcome { success, concurrencyFailure }
 
@@ -36,6 +36,7 @@ class ProgramDetail {
     required this.id,
     required this.title,
     required this.actionStatus,
+    this.operationalStatus = ProgramOperationalStatus.active,
     this.category = '특강',
     this.recruitmentBadge = '모집 중',
     this.applicationPeriod = '신청 08.01–08.10',
@@ -58,6 +59,7 @@ class ProgramDetail {
   final String id;
   final String title;
   final ProgramDetailActionStatus actionStatus;
+  final ProgramOperationalStatus operationalStatus;
   final String category;
   final String recruitmentBadge;
   final String applicationPeriod;
@@ -76,11 +78,15 @@ class ProgramDetail {
   final String programStatusChangedAt;
   final String programCancellationReason;
 
-  ProgramDetail copyWith({ProgramDetailActionStatus? actionStatus}) {
+  ProgramDetail copyWith({
+    ProgramDetailActionStatus? actionStatus,
+    ProgramOperationalStatus? operationalStatus,
+  }) {
     return ProgramDetail(
       id: id,
       title: title,
       actionStatus: actionStatus ?? this.actionStatus,
+      operationalStatus: operationalStatus ?? this.operationalStatus,
       category: category,
       recruitmentBadge: recruitmentBadge,
       applicationPeriod: applicationPeriod,
@@ -231,11 +237,13 @@ const mockProgramDetails = <String, ProgramDetail>{
   'cancelled': ProgramDetail(
     id: 'cancelled',
     title: '현직자와 함께하는 프론트엔드 특강',
-    actionStatus: ProgramDetailActionStatus.programCancelled,
+    actionStatus: ProgramDetailActionStatus.applied,
+    operationalStatus: ProgramOperationalStatus.cancelled,
   ),
   'deleted': ProgramDetail(
     id: 'deleted',
     title: '삭제된 프로그램입니다.',
-    actionStatus: ProgramDetailActionStatus.deleted,
+    actionStatus: ProgramDetailActionStatus.applied,
+    operationalStatus: ProgramOperationalStatus.deleted,
   ),
 };

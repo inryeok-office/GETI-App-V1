@@ -168,10 +168,10 @@ class ProgramDetailBody extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (detail.actionStatus == ProgramDetailActionStatus.programCancelled) {
+    if (detail.operationalStatus == ProgramOperationalStatus.cancelled) {
       return ProgramCancelledDetailBody(detail: detail);
     }
-    if (detail.actionStatus == ProgramDetailActionStatus.deleted) {
+    if (detail.operationalStatus == ProgramOperationalStatus.deleted) {
       return ProgramDeletedDetailBody(detail: detail);
     }
 
@@ -249,8 +249,6 @@ class ProgramDetailAction extends StatelessWidget {
       ProgramDetailActionStatus.cancelling => '신청 취소',
       ProgramDetailActionStatus.cancelled => '신청 취소 완료',
       ProgramDetailActionStatus.cancelFailure => '신청 취소',
-      ProgramDetailActionStatus.programCancelled => '프로그램 취소',
-      ProgramDetailActionStatus.deleted => '삭제된 프로그램',
     };
     return SafeArea(
       top: false,

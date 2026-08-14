@@ -27,6 +27,8 @@ void main() {
     expect(mockPrograms.where((program) => program.isApplied), hasLength(3));
     expect(find.byType(ProgramCard), findsNWidgets(3));
     expect(find.text('신청 완료'), findsNWidgets(3));
+    expect(find.text('프로그램 취소'), findsOneWidget);
+    expect(find.text('삭제됨'), findsOneWidget);
     expect(find.text('삭제된 프로그램입니다.'), findsOneWidget);
   });
   testWidgets('프로그램 없음 상태를 표시한다', (tester) async {

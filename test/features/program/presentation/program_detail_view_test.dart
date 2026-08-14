@@ -100,7 +100,7 @@ void main() {
     expect(find.text('취소됨 (2026.08.05 10:30)'), findsOneWidget);
     expect(find.text('※ 프로그램은 취소되었지만 신청 내역은 확인할 수 있습니다.'), findsOneWidget);
     expect(
-      find.byKey(const ValueKey('program-detail-action-programCancelled')),
+      find.byKey(const ValueKey('program-detail-action-applied')),
       findsNothing,
     );
     expect(find.byType(AppBottomNavigation), findsNothing);
@@ -122,7 +122,7 @@ void main() {
     expect(find.text('※ 프로그램은 삭제되었지만 신청 내역은 확인할 수 있습니다.'), findsOneWidget);
     expect(find.text('프로그램 취소'), findsNothing);
     expect(
-      find.byKey(const ValueKey('program-detail-action-deleted')),
+      find.byKey(const ValueKey('program-detail-action-applied')),
       findsNothing,
     );
     expect(find.byType(AppBottomNavigation), findsNothing);
@@ -143,16 +143,24 @@ void main() {
     expect(full.detail!.id, 'full');
     expect(full.detail!.title, '2026 하반기 취업 전략 설명회');
     expect(full.detail!.actionStatus, ProgramDetailActionStatus.full);
+    final cancelled = container.read(
+      programDetailViewModelProvider('cancelled'),
+    );
+    expect(cancelled.detail!.actionStatus, ProgramDetailActionStatus.applied);
     expect(
-      container
-          .read(programDetailViewModelProvider('cancelled'))
-          .detail!
-          .actionStatus,
-      ProgramDetailActionStatus.programCancelled,
+      cancelled.detail!.operationalStatus,
+      ProgramOperationalStatus.cancelled,
     );
     expect(
       container.read(programDetailViewModelProvider('deleted')).detail!.id,
       'deleted',
+    );
+    expect(
+      container
+          .read(programDetailViewModelProvider('deleted'))
+          .detail!
+          .operationalStatus,
+      ProgramOperationalStatus.deleted,
     );
   });
 
