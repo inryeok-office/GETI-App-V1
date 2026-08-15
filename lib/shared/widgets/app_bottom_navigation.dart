@@ -6,13 +6,14 @@ import 'package:geti_app/shared/theme/app_typography.dart';
 import 'package:go_router/go_router.dart';
 
 /// [AppBottomNavigation]의 탭 인덱스를 실제 라우트로 이동시킵니다.
-/// '알림'(2)은 아직 연결된 화면이 없어 탭해도 아무 동작을 하지 않습니다.
 void navigateToBottomTab(BuildContext context, int index) {
   switch (index) {
     case 0:
       context.go('/');
     case 1:
       context.go('/jobs');
+    case 2:
+      context.go('/notifications');
     case 3:
       context.go('/applications');
   }

@@ -15,6 +15,7 @@ abstract final class AppColors {
   static const onBackground = Color(0xFF111111);
   static const surface = Color(0xFFFFFFFF);
   static const onSurface = Color(0xFF111111);
+  static const neutral50 = Color(0xFFFAFAFA);
   static const neutral900 = Color(0xFF111111);
   static const neutral800 = Color(0xFF262626);
   static const neutral700 = Color(0xFF404040);
