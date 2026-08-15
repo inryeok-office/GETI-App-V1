@@ -53,13 +53,15 @@ class NotificationView extends ConsumerWidget {
     NotificationViewModel viewModel,
     NotificationItem notification,
   ) {
+    viewModel.markAsRead(notification.id);
+
     switch (notification.targetState) {
       case NotificationTargetState.deleted:
         context.push('/notifications/deleted');
       case NotificationTargetState.forbidden:
         context.push('/notifications/forbidden');
       case null:
-        viewModel.markAsRead(notification.id);
+        break;
     }
   }
 }
@@ -104,19 +106,6 @@ class NotificationScreenBody extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (state.screenStatus == NotificationScreenStatus.targetDeleted) {
-      return NotificationStateContent(
-        type: NotificationStateContentType.targetDeleted,
-        onAction: () => context.go('/notifications'),
-      );
-    }
-    if (state.screenStatus == NotificationScreenStatus.targetForbidden) {
-      return NotificationStateContent(
-        type: NotificationStateContentType.targetForbidden,
-        onAction: () => context.go('/notifications'),
-      );
-    }
-
     return Center(
       child: SizedBox(
         width: 326.w,
@@ -151,8 +140,6 @@ class NotificationScreenBody extends StatelessWidget {
         state: state,
         onNotificationTap: onNotificationTap,
       ),
-      NotificationScreenStatus.targetDeleted ||
-      NotificationScreenStatus.targetForbidden => const SizedBox.shrink(),
     };
   }
 }

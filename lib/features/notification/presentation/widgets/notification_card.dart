@@ -25,7 +25,7 @@ class NotificationCard extends StatelessWidget {
             color: notification.isRead
                 ? AppColors.surface
                 : AppColors.primarySurface,
-            border: Border.all(color: AppColors.neutral100),
+            border: Border.all(color: AppColors.background),
             borderRadius: borderRadius,
           ),
           child: ConstrainedBox(

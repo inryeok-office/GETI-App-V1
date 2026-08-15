@@ -201,6 +201,56 @@ void main() {
     expect(notificationNavigation.properties.selected, isTrue);
   });
 
+  testWidgets('삭제된 대상 알림도 탭하면 읽음 처리 후 상태 화면으로 이동한다', (tester) async {
+    const initialState = NotificationViewState(
+      notifications: [
+        NotificationItem(
+          id: 'unread-deleted-target',
+          title: '프로그램 신청이 완료되었습니다.',
+          description: '프론트엔드 특강 신청이 완료되었습니다.',
+          time: '방금',
+          isRead: false,
+          targetState: NotificationTargetState.deleted,
+        ),
+      ],
+    );
+    final container = ProviderContainer(
+      overrides: [
+        notificationViewModelProvider.overrideWith(
+          () => _SeededNotificationViewModel(initialState),
+        ),
+      ],
+    );
+    addTearDown(container.dispose);
+
+    final router = GoRouter(
+      initialLocation: '/notifications',
+      routes: [
+        GoRoute(
+          path: '/notifications',
+          builder: (context, state) => const NotificationView(),
+          routes: [
+            GoRoute(
+              path: 'deleted',
+              builder: (context, state) =>
+                  const NotificationTargetDeletedView(),
+            ),
+          ],
+        ),
+      ],
+    );
+    addTearDown(router.dispose);
+
+    await _pumpRouter(tester, router, container: container);
+    expect(container.read(notificationViewModelProvider).unreadCount, 1);
+
+    await tester.tap(find.text('프로그램 신청이 완료되었습니다.'));
+    await tester.pumpAndSettle();
+
+    expect(container.read(notificationViewModelProvider).unreadCount, 0);
+    expect(find.text('삭제된 항목이에요.'), findsOneWidget);
+  });
+
   testWidgets('대상 삭제 Route에서 알림 목록으로 돌아간다', (tester) async {
     final router = GoRouter(
       initialLocation: '/notifications/deleted',
@@ -291,15 +341,20 @@ Future<void> _pumpStateContent(
   await tester.pump();
 }
 
-Future<void> _pumpRouter(WidgetTester tester, GoRouter router) async {
+Future<void> _pumpRouter(
+  WidgetTester tester,
+  GoRouter router, {
+  ProviderContainer? container,
+}) async {
   await _setViewport(tester);
+  final child = ScreenUtilInit(
+    designSize: const Size(390, 844),
+    builder: (context, child) => MaterialApp.router(routerConfig: router),
+  );
   await tester.pumpWidget(
-    ProviderScope(
-      child: ScreenUtilInit(
-        designSize: const Size(390, 844),
-        builder: (context, child) => MaterialApp.router(routerConfig: router),
-      ),
-    ),
+    container == null
+        ? ProviderScope(child: child)
+        : UncontrolledProviderScope(container: container, child: child),
   );
   await tester.pump();
 }
@@ -309,4 +364,13 @@ Future<void> _setViewport(WidgetTester tester) async {
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.resetPhysicalSize);
   addTearDown(tester.view.resetDevicePixelRatio);
+}
+
+class _SeededNotificationViewModel extends NotificationViewModel {
+  _SeededNotificationViewModel(this.initialState);
+
+  final NotificationViewState initialState;
+
+  @override
+  NotificationViewState build() => initialState;
 }

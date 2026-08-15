@@ -2,13 +2,7 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 part 'notification_view_model.g.dart';
 
-enum NotificationScreenStatus {
-  loaded,
-  loading,
-  networkError,
-  targetDeleted,
-  targetForbidden,
-}
+enum NotificationScreenStatus { loaded, loading, networkError }
 
 enum NotificationFilter { all, unread }
 
