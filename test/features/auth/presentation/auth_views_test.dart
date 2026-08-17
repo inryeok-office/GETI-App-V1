@@ -6,6 +6,7 @@ import 'package:geti_app/features/auth/presentation/view/login_view.dart';
 import 'package:geti_app/features/auth/presentation/view/profile_completion_guide_view.dart';
 import 'package:geti_app/features/auth/presentation/view/relogin_prompt_view.dart';
 import 'package:geti_app/features/auth/presentation/widgets/logout_confirm_dialog.dart';
+import 'package:geti_app/shared/widgets/common_error_view.dart';
 import 'package:go_router/go_router.dart';
 
 void main() {
@@ -73,7 +74,12 @@ void main() {
   testWidgets('재로그인 안내 화면이 390px 기준으로 오버플로우 없이 표시된다', (tester) async {
     await _pumpRoute(tester, '/relogin');
 
+    expect(find.byType(CommonErrorView), findsOneWidget);
     expect(find.text('로그인이 만료되었습니다.'), findsOneWidget);
+    expect(
+      find.text('보안을 위해 로그인 시간이 만료되었습니다.\n다시 로그인하여 서비스를 이용해 주세요.'),
+      findsOneWidget,
+    );
     expect(find.text('다시 로그인'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
