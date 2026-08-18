@@ -84,6 +84,16 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('다시 로그인 버튼을 누르면 로그인 화면으로 이동한다', (tester) async {
+    await _pumpRoute(tester, '/relogin');
+
+    await tester.tap(find.text('다시 로그인'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('교내 계정으로 로그인'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('로그아웃 확인 다이얼로그가 390px 기준으로 오버플로우 없이 표시된다', (tester) async {
     await _setViewport(tester);
     var result = false;

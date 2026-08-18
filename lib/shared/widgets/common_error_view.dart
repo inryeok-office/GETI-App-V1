@@ -4,6 +4,11 @@ import 'package:geti_app/shared/theme/app_colors.dart';
 import 'package:geti_app/shared/theme/app_spacing.dart';
 import 'package:geti_app/shared/theme/app_typography.dart';
 
+const double _contentTopPadding = 244;
+const double _standardErrorActionSpacing = 12;
+
+/// Figma 오류 화면을 표시하기 위한 UI preset입니다.
+/// 실제 HTTP/Auth 오류와의 연결은 각 기능의 연동 계층에서 처리합니다.
 enum CommonErrorType { forbidden, notFound, network, sessionExpired }
 
 class CommonErrorView extends StatelessWidget {
@@ -26,7 +31,7 @@ class CommonErrorView extends StatelessWidget {
         child: SingleChildScrollView(
           padding: EdgeInsets.fromLTRB(
             AppSpacing.xl.w,
-            244.h,
+            _contentTopPadding.h,
             AppSpacing.xl.w,
             AppSpacing.lg.h,
           ),
@@ -106,19 +111,19 @@ class _CommonErrorContent {
         title: '접근 권한이 없습니다.',
         description: '이 페이지를 볼 수 있는 권한이 없습니다.\n권한을 확인한 후 다시 이용해 주세요.',
         actionText: '홈으로 이동',
-        actionSpacing: 12,
+        actionSpacing: _standardErrorActionSpacing,
       ),
       CommonErrorType.notFound => const _CommonErrorContent(
         title: '페이지를 찾을 수 없습니다.',
         description: '주소가 잘못되었거나 페이지가\n삭제 또는 이동되었을 수 있습니다.',
         actionText: '홈으로 이동',
-        actionSpacing: 12,
+        actionSpacing: _standardErrorActionSpacing,
       ),
       CommonErrorType.network => const _CommonErrorContent(
         title: '네트워크에 연결할 수 없습니다.',
         description: '인터넷 연결 상태를 확인한 후\n다시 시도해 주세요.',
         actionText: '다시 시도',
-        actionSpacing: 12,
+        actionSpacing: _standardErrorActionSpacing,
       ),
       CommonErrorType.sessionExpired => const _CommonErrorContent(
         title: '로그인이 만료되었습니다.',
