@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:geti_app/app/app.dart';
+import 'package:geti_app/core/network/session_provider.dart';
 import 'package:geti_app/shared/theme/app_colors.dart';
 
 void main() {
@@ -47,6 +48,33 @@ void main() {
       jobsIcon.colorFilter,
       const ColorFilter.mode(AppColors.neutral500, BlendMode.srcIn),
     );
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('세션이 만료되면 자동으로 재로그인 안내로 이동한다', (tester) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final container = ProviderContainer();
+    addTearDown(container.dispose);
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(container: container, child: const GetiApp()),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('교내 계정으로 로그인'));
+    await tester.pump(const Duration(milliseconds: 800));
+    await tester.pumpAndSettle();
+    expect(find.text('맞춤 추천'), findsOneWidget);
+
+    container.read(sessionExpiredProvider.notifier).notifyExpired();
+    await tester.pumpAndSettle();
+
+    expect(find.text('로그인이 만료되었습니다.'), findsOneWidget);
+    expect(container.read(sessionExpiredProvider), isFalse);
     expect(tester.takeException(), isNull);
   });
 }
