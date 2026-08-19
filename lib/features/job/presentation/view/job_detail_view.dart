@@ -7,6 +7,7 @@ import 'package:geti_app/features/job/presentation/view_model/job_view_model.dar
 import 'package:geti_app/shared/theme/app_colors.dart';
 import 'package:geti_app/shared/theme/app_typography.dart';
 import 'package:go_router/go_router.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class JobDetailView extends ConsumerWidget {
   const JobDetailView({required this.jobId, super.key});
@@ -48,7 +49,11 @@ class JobDetailView extends ConsumerWidget {
       ),
       body: job == null || detail == null
           ? const _JobNotFound()
-          : _JobDetailBody(job: job, detail: detail),
+          : _JobDetailBody(
+              job: job,
+              detail: detail,
+              viewCount: state.viewCount,
+            ),
     );
   }
 }
@@ -80,9 +85,14 @@ class _JobNotFound extends StatelessWidget {
 }
 
 class _JobDetailBody extends ConsumerWidget {
-  const _JobDetailBody({required this.job, required this.detail});
+  const _JobDetailBody({
+    required this.job,
+    required this.detail,
+    required this.viewCount,
+  });
   final JobItem job;
   final JobDetail detail;
+  final int viewCount;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -123,7 +133,18 @@ class _JobDetailBody extends ConsumerWidget {
                     ),
                     _HiringProcessSection(steps: detail.hiringProcess),
                     SizedBox(height: 24.h),
-                    _JobApplicationInfoCard(job: job, detail: detail),
+                    _JobApplicationInfoCard(
+                      job: job,
+                      detail: detail,
+                      viewCount: viewCount,
+                    ),
+                    if (detail.attachmentName != null) ...[
+                      SizedBox(height: 24.h),
+                      _JobAttachmentSection(
+                        name: detail.attachmentName!,
+                        description: detail.attachmentDescription ?? '',
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -332,9 +353,14 @@ class _HiringProcessSection extends StatelessWidget {
 }
 
 class _JobApplicationInfoCard extends StatelessWidget {
-  const _JobApplicationInfoCard({required this.job, required this.detail});
+  const _JobApplicationInfoCard({
+    required this.job,
+    required this.detail,
+    required this.viewCount,
+  });
   final JobItem job;
   final JobDetail detail;
+  final int viewCount;
 
   @override
   Widget build(BuildContext context) {
@@ -344,6 +370,7 @@ class _JobApplicationInfoCard extends StatelessWidget {
       ('지원 유형', detail.applicationTypeLabel),
       if (detail.sourceName != null) ('공고 출처', detail.sourceName!),
       if (detail.targetAudience != null) ('지원 대상', detail.targetAudience!),
+      ('조회수', '$viewCount회'),
     ];
 
     return Container(
@@ -415,6 +442,42 @@ class _JobApplicationInfoCard extends StatelessWidget {
   }
 }
 
+class _JobAttachmentSection extends StatelessWidget {
+  const _JobAttachmentSection({required this.name, required this.description});
+  final String name;
+  final String description;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    width: double.infinity,
+    padding: EdgeInsets.all(16.w),
+    decoration: BoxDecoration(
+      color: AppColors.surface,
+      border: Border.all(color: AppColors.neutral200),
+      borderRadius: BorderRadius.circular(16.r),
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          '첨부파일',
+          style: AppTypography.heading3.copyWith(color: AppColors.neutral900),
+        ),
+        SizedBox(height: 12.h),
+        Text(
+          name,
+          style: AppTypography.body.copyWith(color: AppColors.neutral900),
+        ),
+        SizedBox(height: 4.h),
+        Text(
+          description,
+          style: AppTypography.caption.copyWith(color: AppColors.neutral600),
+        ),
+      ],
+    ),
+  );
+}
+
 class _JobDetailAction extends StatelessWidget {
   const _JobDetailAction({
     required this.job,
@@ -432,6 +495,13 @@ class _JobDetailAction extends StatelessWidget {
   Widget build(BuildContext context) {
     final isSchool = job.source == JobSource.school;
     final isClosed = job.isClosed;
+    final isIneligible = !isClosed && !job.canApply;
+    final isDisabled = isClosed || isIneligible;
+    final buttonLabel = switch ((isClosed, isIneligible)) {
+      (true, _) => '마감된 공고입니다',
+      (false, true) => job.eligibilityReason ?? '지원할 수 없는 공고입니다',
+      (false, false) => isSchool ? '지원서 작성하기' : '사이트에서 지원하기',
+    };
     return SafeArea(
       top: false,
       child: Padding(
@@ -443,7 +513,9 @@ class _JobDetailAction extends StatelessWidget {
               height: 42.h,
               child: ElevatedButton(
                 key: const ValueKey('job-detail-apply'),
-                onPressed: isClosed ? null : () => _onApply(context, isSchool),
+                onPressed: isDisabled
+                    ? null
+                    : () => _onApply(context, isSchool),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.primary,
                   foregroundColor: AppColors.onPrimary,
@@ -451,7 +523,7 @@ class _JobDetailAction extends StatelessWidget {
                   disabledForegroundColor: AppColors.neutral600,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(8.r),
-                    side: isClosed
+                    side: isDisabled
                         ? const BorderSide(color: AppColors.neutral200)
                         : BorderSide.none,
                   ),
@@ -461,11 +533,10 @@ class _JobDetailAction extends StatelessWidget {
                   ),
                 ),
                 child: Text(
-                  isClosed
-                      ? '마감된 공고입니다'
-                      : (isSchool ? '지원서 작성하기' : '사이트에서 지원하기'),
+                  buttonLabel,
+                  textAlign: TextAlign.center,
                   style: AppTypography.label.copyWith(
-                    color: isClosed
+                    color: isDisabled
                         ? AppColors.neutral600
                         : AppColors.onPrimary,
                   ),
@@ -529,7 +600,11 @@ class _JobDetailAction extends StatelessWidget {
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.of(context).pop(),
+            key: const ValueKey('job-detail-apply-external-confirm'),
+            onPressed: () {
+              Navigator.of(context).pop();
+              _launchExternalUrl(detail.externalUrl);
+            },
             child: Text(
               '확인',
               style: AppTypography.label.copyWith(color: AppColors.primary),
@@ -538,5 +613,13 @@ class _JobDetailAction extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  Future<void> _launchExternalUrl(String? rawUrl) async {
+    if (rawUrl == null) return;
+    final normalized = rawUrl.startsWith('http') ? rawUrl : 'https://$rawUrl';
+    final uri = Uri.tryParse(normalized);
+    if (uri == null) return;
+    await launchUrl(uri, mode: LaunchMode.externalApplication);
   }
 }

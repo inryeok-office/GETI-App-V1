@@ -51,6 +51,8 @@ class JobView extends ConsumerWidget {
                         query: state.searchQuery,
                         onChanged: viewModel.updateSearchQuery,
                       ),
+                      SizedBox(height: 12.h),
+                      _JobFilterRow(state: state, viewModel: viewModel),
                       SizedBox(height: 20.h),
                       Expanded(
                         child: _JobList(
@@ -74,6 +76,174 @@ class JobView extends ConsumerWidget {
         child: AppBottomNavigation(
           currentIndex: 1,
           onTap: (index) => navigateToBottomTab(context, index),
+        ),
+      ),
+    );
+  }
+}
+
+class _JobFilterRow extends StatelessWidget {
+  const _JobFilterRow({required this.state, required this.viewModel});
+
+  final JobViewState state;
+  final JobViewModel viewModel;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 36.h,
+      child: ListView(
+        scrollDirection: Axis.horizontal,
+        children: [
+          _JobFilterChip(
+            key: const ValueKey('job-type-filter'),
+            label: '유형 ${state.typeFilter ?? '전체'}',
+            selected: state.typeFilter != null,
+            onTap: () => _showOptionSheet(
+              context: context,
+              title: '공고 유형',
+              options: ['전체', ...state.availableTypes],
+              selectedLabel: state.typeFilter ?? '전체',
+              onSelected: (label) =>
+                  viewModel.updateTypeFilter(label == '전체' ? null : label),
+            ),
+          ),
+          SizedBox(width: 8.w),
+          _JobFilterChip(
+            key: const ValueKey('job-source-filter'),
+            label: '출처 ${_sourceLabel(state.sourceFilter)}',
+            selected: state.sourceFilter != null,
+            onTap: () => _showOptionSheet(
+              context: context,
+              title: '공고 출처',
+              options: const ['전체', '학교', '외부'],
+              selectedLabel: _sourceLabel(state.sourceFilter),
+              onSelected: (label) =>
+                  viewModel.updateSourceFilter(switch (label) {
+                    '학교' => JobSource.school,
+                    '외부' => JobSource.external,
+                    _ => null,
+                  }),
+            ),
+          ),
+          SizedBox(width: 8.w),
+          _JobFilterChip(
+            key: const ValueKey('job-deadline-soon-filter'),
+            label: '마감임박',
+            selected: state.deadlineSoonOnly,
+            onTap: () =>
+                viewModel.updateDeadlineSoonOnly(!state.deadlineSoonOnly),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _sourceLabel(JobSource? source) => switch (source) {
+    JobSource.school => '학교',
+    JobSource.external => '외부',
+    null => '전체',
+  };
+
+  void _showOptionSheet({
+    required BuildContext context,
+    required String title,
+    required List<String> options,
+    required String selectedLabel,
+    required ValueChanged<String> onSelected,
+  }) {
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: AppColors.surface,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16.r)),
+      ),
+      builder: (sheetContext) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            SizedBox(height: 12.h),
+            Text(
+              title,
+              style: AppTypography.heading3.copyWith(
+                color: AppColors.neutral900,
+              ),
+            ),
+            SizedBox(height: 8.h),
+            for (final option in options)
+              InkWell(
+                key: ValueKey('job-filter-option-$option'),
+                onTap: () {
+                  Navigator.of(sheetContext).pop();
+                  onSelected(option);
+                },
+                child: Padding(
+                  padding: EdgeInsets.symmetric(
+                    horizontal: 24.w,
+                    vertical: 14.h,
+                  ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          option,
+                          style: AppTypography.bodyLarge.copyWith(
+                            color: option == selectedLabel
+                                ? AppColors.primary
+                                : AppColors.neutral900,
+                            fontWeight: option == selectedLabel
+                                ? FontWeight.w700
+                                : FontWeight.w400,
+                          ),
+                        ),
+                      ),
+                      if (option == selectedLabel)
+                        Icon(Icons.check, size: 20.w, color: AppColors.primary),
+                    ],
+                  ),
+                ),
+              ),
+            SizedBox(height: 12.h),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _JobFilterChip extends StatelessWidget {
+  const _JobFilterChip({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+    super.key,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(8.r),
+      child: Container(
+        height: 36.h,
+        padding: EdgeInsets.symmetric(horizontal: 12.w),
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: selected ? AppColors.primarySubtle : AppColors.surface,
+          border: Border.all(
+            color: selected ? AppColors.primary : AppColors.neutral200,
+          ),
+          borderRadius: BorderRadius.circular(8.r),
+        ),
+        child: Text(
+          label,
+          style: AppTypography.captionMedium.copyWith(
+            color: selected ? AppColors.primary : AppColors.neutral600,
+          ),
         ),
       ),
     );

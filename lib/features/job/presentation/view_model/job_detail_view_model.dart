@@ -16,6 +16,9 @@ class JobDetail {
     this.sourceName,
     this.externalUrl,
     this.targetAudience,
+    this.attachmentName,
+    this.attachmentDescription,
+    this.baseViewCount = 0,
   });
 
   final String recruitmentPeriod;
@@ -33,13 +36,22 @@ class JobDetail {
 
   /// 학교 공고에서만 사용됩니다.
   final String? targetAudience;
+
+  /// 첨부파일이 없으면 null이며, 상세 화면에서 섹션 자체가 숨겨집니다.
+  final String? attachmentName;
+  final String? attachmentDescription;
+
+  /// 화면 진입 전까지의 누적 조회수입니다. 실제 조회수는 여기에 이번 세션의
+  /// 진입 횟수를 더해 계산합니다.
+  final int baseViewCount;
 }
 
 class JobDetailViewState {
-  const JobDetailViewState({this.job, this.detail});
+  const JobDetailViewState({this.job, this.detail, this.viewCount = 0});
 
   final JobItem? job;
   final JobDetail? detail;
+  final int viewCount;
 }
 
 @riverpod
@@ -51,7 +63,12 @@ class JobDetailViewModel extends _$JobDetailViewModel {
     // 전용 부가 정보(mockJobDetails)만 별도로 조회합니다.
     final jobs = ref.watch(jobViewModelProvider).jobs;
     final job = jobs.where((job) => job.id == jobId).firstOrNull;
-    return JobDetailViewState(job: job, detail: mockJobDetails[jobId]);
+    final detail = mockJobDetails[jobId];
+    return JobDetailViewState(
+      job: job,
+      detail: detail,
+      viewCount: (detail?.baseViewCount ?? 0) + 1,
+    );
   }
 }
 
@@ -70,6 +87,9 @@ const mockJobDetails = <String, JobDetail>{
       '모집 기간: 2026.07.20 ~ 2026.08.14',
     ],
     hiringProcess: ['서류 심사', '면접', '최종 합격'],
+    attachmentName: 'kepco_intern_guide.pdf',
+    attachmentDescription: '1.2MB',
+    baseViewCount: 128,
   ),
   'naver-cloud-intern': JobDetail(
     recruitmentPeriod: '2026.07.20 ~ 2026.08.20',
@@ -95,6 +115,7 @@ const mockJobDetails = <String, JobDetail>{
       '모집 기간: 2026.07.20 ~ 2026.08.20',
     ],
     hiringProcess: ['서류 심사', '면접', '최종 합격'],
+    baseViewCount: 342,
   ),
   'woowa-frontend': JobDetail(
     recruitmentPeriod: '2026.07.01 ~ 2026.08.14',
@@ -126,5 +147,20 @@ const mockJobDetails = <String, JobDetail>{
       '모집 기간: 2026.07.15 ~ 2026.08.31',
     ],
     hiringProcess: ['서류 심사', '포트폴리오 심사', '면접', '최종 합격'],
+  ),
+  'toss-payments-fe': JobDetail(
+    recruitmentPeriod: '2026.08.10 ~ 2026.08.25',
+    applicationTypeLabel: '교내 지원서 작성',
+    targetAudience: '광주소프트웨어마이스터고 3학년 재학생',
+    description: '토스페이먼츠에서 3학년 대상 프론트엔드 채용형 인턴을 모집합니다.',
+    responsibilities: ['결제 서비스 프론트엔드 개발', '내부 도구 UI 개선'],
+    qualifications: ['광주소프트웨어마이스터고 3학년 재학생'],
+    preferredQualifications: ['TypeScript 경험'],
+    workConditions: [
+      '근무 형태: 채용형 인턴',
+      '근무 지역: 서울',
+      '모집 기간: 2026.08.10 ~ 2026.08.25',
+    ],
+    hiringProcess: ['서류 심사', '면접', '최종 합격'],
   ),
 };

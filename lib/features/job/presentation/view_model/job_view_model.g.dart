@@ -41,7 +41,7 @@ final class JobViewModelProvider
   }
 }
 
-String _$jobViewModelHash() => r'b6c1cade6a5650126e205f3728050d5a7892a29c';
+String _$jobViewModelHash() => r'24d21129d52be855b88351397a91a6a3c3992c1b';
 
 abstract class _$JobViewModel extends $Notifier<JobViewState> {
   JobViewState build();
