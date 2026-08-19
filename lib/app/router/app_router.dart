@@ -3,6 +3,8 @@ import 'package:geti_app/features/application/presentation/view/application_deta
 import 'package:geti_app/features/auth/presentation/view/login_view.dart';
 import 'package:geti_app/features/auth/presentation/view/profile_completion_guide_view.dart';
 import 'package:geti_app/features/auth/presentation/view/relogin_prompt_view.dart';
+import 'package:geti_app/features/company/presentation/view/company_detail_view.dart';
+import 'package:geti_app/features/company/presentation/view/company_view.dart';
 import 'package:geti_app/features/job/presentation/view/job_bookmark_view.dart';
 import 'package:geti_app/features/job/presentation/view/job_detail_view.dart';
 import 'package:geti_app/features/job/presentation/view/job_view.dart';
@@ -57,6 +59,20 @@ GoRouter appRouter(Ref ref) {
             name: 'job-detail',
             builder: (context, state) =>
                 JobDetailView(jobId: state.pathParameters['jobId']!),
+          ),
+        ],
+      ),
+      GoRoute(
+        path: '/companies',
+        name: 'companies',
+        builder: (context, state) => const CompanyView(),
+        routes: [
+          GoRoute(
+            path: ':companyId',
+            name: 'company-detail',
+            builder: (context, state) => CompanyDetailView(
+              companyId: state.pathParameters['companyId']!,
+            ),
           ),
         ],
       ),
