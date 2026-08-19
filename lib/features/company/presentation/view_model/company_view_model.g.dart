@@ -41,7 +41,7 @@ final class CompanyViewModelProvider
   }
 }
 
-String _$companyViewModelHash() => r'92da4c289f8f7e7134a3448d20692288e43399b6';
+String _$companyViewModelHash() => r'bd1cd7ad54614fcecc18789405b45c1d6265ca83';
 
 abstract class _$CompanyViewModel extends $Notifier<CompanyViewState> {
   CompanyViewState build();
