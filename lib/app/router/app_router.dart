@@ -8,6 +8,7 @@ import 'package:geti_app/features/company/presentation/view/company_view.dart';
 import 'package:geti_app/features/job/presentation/view/job_bookmark_view.dart';
 import 'package:geti_app/features/job/presentation/view/job_detail_view.dart';
 import 'package:geti_app/features/job/presentation/view/job_view.dart';
+import 'package:geti_app/features/notification/presentation/view/notification_view.dart';
 import 'package:geti_app/features/recommendation/presentation/view/recommendation_view.dart';
 import 'package:geti_app/features/program/presentation/view/program_view.dart';
 import 'package:geti_app/features/program/presentation/view/program_detail_view.dart';
@@ -86,6 +87,24 @@ GoRouter appRouter(Ref ref) {
             builder: (context, state) => ProgramDetailView(
               programId: state.pathParameters['programId']!,
             ),
+          ),
+        ],
+      ),
+      GoRoute(
+        path: '/notifications',
+        name: 'notifications',
+        builder: (context, state) => const NotificationView(),
+        routes: [
+          GoRoute(
+            path: 'deleted',
+            name: 'notification-target-deleted',
+            builder: (context, state) => const NotificationTargetDeletedView(),
+          ),
+          GoRoute(
+            path: 'forbidden',
+            name: 'notification-target-forbidden',
+            builder: (context, state) =>
+                const NotificationTargetForbiddenView(),
           ),
         ],
       ),
