@@ -68,6 +68,75 @@ void main() {
     });
   }
 
+  testWidgets('제출 완료 상세에서 지원 취소를 누르면 취소 완료 상태로 전환된다', (tester) async {
+    await _pumpWidget(
+      tester,
+      const ProviderScope(
+        child: ApplicationDetailView(applicationId: 'submitted'),
+      ),
+    );
+
+    await tester.tap(find.byKey(const ValueKey('application-detail-withdraw')));
+    await tester.pump();
+
+    expect(find.text('취소'), findsOneWidget);
+    expect(find.text('취소 완료'), findsOneWidget);
+    expect(find.text('해당 지원이 취소되었습니다.'), findsOneWidget);
+    expect(find.text('지원 취소'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('application-detail-withdraw')),
+      findsNothing,
+    );
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('수정 요청 상세에서 웹 수정 재제출을 누르면 제출 완료 상태로 전환된다', (tester) async {
+    await _pumpWidget(
+      tester,
+      const ProviderScope(
+        child: ApplicationDetailView(applicationId: 'revision'),
+      ),
+    );
+
+    await tester.tap(find.byKey(const ValueKey('application-detail-resubmit')));
+    await tester.pump();
+
+    expect(find.text('제출 완료'), findsAtLeastNWidgets(1));
+    expect(find.text('재제출 완료'), findsOneWidget);
+    expect(find.text('수정·보완 요청'), findsNothing);
+    expect(
+      find.byKey(const ValueKey('application-detail-resubmit')),
+      findsNothing,
+    );
+    expect(
+      find.byKey(const ValueKey('application-detail-withdraw')),
+      findsOneWidget,
+    );
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('수정 요청 상세에서 지원 취소를 누르면 취소 완료 상태로 전환된다', (tester) async {
+    await _pumpWidget(
+      tester,
+      const ProviderScope(
+        child: ApplicationDetailView(applicationId: 'revision'),
+      ),
+    );
+
+    await tester.tap(find.byKey(const ValueKey('application-detail-withdraw')));
+    await tester.pump();
+
+    expect(find.text('취소'), findsOneWidget);
+    expect(find.text('취소 완료'), findsOneWidget);
+    expect(find.text('해당 지원이 취소되었습니다.'), findsOneWidget);
+    expect(find.text('지원 취소'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('application-detail-resubmit')),
+      findsNothing,
+    );
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('로딩 상태를 표시한다', (tester) async {
     await _pumpState(tester, ApplicationDetailScreenStatus.loading);
     expect(
