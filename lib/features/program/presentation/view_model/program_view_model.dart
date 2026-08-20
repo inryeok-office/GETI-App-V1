@@ -1,4 +1,7 @@
 import 'package:riverpod_annotation/riverpod_annotation.dart';
+
+import 'program_type.dart';
+
 part 'program_view_model.g.dart';
 
 enum ProgramScreenStatus { loaded, loading, networkError }
@@ -22,6 +25,7 @@ class ProgramItem {
     required this.location,
     required this.applicationPeriod,
     required this.status,
+    this.type = ProgramType.specialLecture,
     this.isApplied = false,
   });
   final String id;
@@ -30,7 +34,10 @@ class ProgramItem {
   final String location;
   final String applicationPeriod;
   final ProgramRecruitmentStatus status;
+  final ProgramType type;
   final bool isApplied;
+
+  String get typeLabel => type.label;
 }
 
 class ProgramViewState {

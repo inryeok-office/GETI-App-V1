@@ -1,5 +1,7 @@
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
+import 'program_type.dart';
+
 part 'program_detail_view_model.g.dart';
 
 enum ProgramDetailActionStatus {
@@ -37,7 +39,7 @@ class ProgramDetail {
     required this.title,
     required this.actionStatus,
     this.operationalStatus = ProgramOperationalStatus.active,
-    this.category = '특강',
+    this.type = ProgramType.specialLecture,
     this.recruitmentBadge = '모집 중',
     this.applicationPeriod = '신청 08.01–08.10',
     this.viewCount = '조회수 128',
@@ -60,7 +62,7 @@ class ProgramDetail {
   final String title;
   final ProgramDetailActionStatus actionStatus;
   final ProgramOperationalStatus operationalStatus;
-  final String category;
+  final ProgramType type;
   final String recruitmentBadge;
   final String applicationPeriod;
   final String viewCount;
@@ -77,6 +79,7 @@ class ProgramDetail {
   final String applicationSubmittedAt;
   final String programStatusChangedAt;
   final String programCancellationReason;
+  String get typeLabel => type.label;
 
   ProgramDetail copyWith({
     ProgramDetailActionStatus? actionStatus,
@@ -87,7 +90,7 @@ class ProgramDetail {
       title: title,
       actionStatus: actionStatus ?? this.actionStatus,
       operationalStatus: operationalStatus ?? this.operationalStatus,
-      category: category,
+      type: type,
       recruitmentBadge: recruitmentBadge,
       applicationPeriod: applicationPeriod,
       viewCount: viewCount,

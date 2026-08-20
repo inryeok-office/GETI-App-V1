@@ -4,13 +4,25 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:geti_app/features/program/presentation/view/program_view.dart';
 import 'package:geti_app/features/program/presentation/view_model/program_view_model.dart';
+import 'package:geti_app/features/program/presentation/view_model/program_type.dart';
 import 'package:geti_app/features/program/presentation/widgets/program_card.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+  test('ProgramType은 GETI PROGRAM_TYPE 명세 값을 UI 라벨과 분리해서 관리한다', () {
+    expect(ProgramType.specialLecture.label, '특강');
+    expect(ProgramType.education.label, '교육');
+  });
+
   testWidgets('전체 목록과 홈 활성 상태를 표시한다', (tester) async {
     await _pumpView(tester);
     expect(mockPrograms, hasLength(7));
+    expect(
+      mockPrograms.every(
+        (program) => program.type == ProgramType.specialLecture,
+      ),
+      isTrue,
+    );
     expect(find.byType(ProgramCard), findsWidgets);
     final home = tester.widget<Semantics>(
       find.byWidgetPredicate(
@@ -30,6 +42,29 @@ void main() {
     expect(find.text('프로그램 취소'), findsOneWidget);
     expect(find.text('삭제됨'), findsOneWidget);
     expect(find.text('삭제된 프로그램입니다.'), findsOneWidget);
+  });
+
+  testWidgets('목록 카드는 Figma에 없는 프로그램 유형 배지를 표시하지 않는다', (tester) async {
+    await _pumpBody(
+      tester,
+      const ProgramViewState(
+        programs: [
+          ProgramItem(
+            id: 'education',
+            title: '취업 교육 프로그램',
+            schedule: '08.12 14:00-16:00',
+            location: '광주소프트웨어마이스터고 시청각실',
+            applicationPeriod: '2026.07.20 - 2026.08.10',
+            status: ProgramRecruitmentStatus.recruiting,
+            type: ProgramType.education,
+          ),
+        ],
+      ),
+    );
+
+    expect(find.text('모집 중'), findsOneWidget);
+    expect(find.text('교육'), findsNothing);
+    expect(find.byType(ProgramCard), findsOneWidget);
   });
   testWidgets('프로그램 없음 상태를 표시한다', (tester) async {
     await _pumpBody(tester, const ProgramViewState(programs: []));
