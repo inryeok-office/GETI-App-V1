@@ -32,6 +32,60 @@ void main() {
     expect(second.detailId, 'second-submitted');
   });
 
+  test('withdrawApplication updates the list mock status too', () {
+    final container = ProviderContainer();
+    final detailSubscription = container.listen(
+      applicationDetailViewModelProvider('submitted'),
+      (_, _) {},
+      fireImmediately: true,
+    );
+    final listSubscription = container.listen(
+      applicationViewModelProvider,
+      (_, _) {},
+      fireImmediately: true,
+    );
+    addTearDown(detailSubscription.close);
+    addTearDown(listSubscription.close);
+    addTearDown(container.dispose);
+
+    container
+        .read(applicationDetailViewModelProvider('submitted').notifier)
+        .withdrawApplication();
+
+    final application = container
+        .read(applicationViewModelProvider)
+        .applications
+        .singleWhere((application) => application.id == 'submitted');
+    expect(application.status, ApplicationProgressStatus.cancelled);
+  });
+
+  test('resubmitApplication updates the list mock status too', () {
+    final container = ProviderContainer();
+    final detailSubscription = container.listen(
+      applicationDetailViewModelProvider('revision'),
+      (_, _) {},
+      fireImmediately: true,
+    );
+    final listSubscription = container.listen(
+      applicationViewModelProvider,
+      (_, _) {},
+      fireImmediately: true,
+    );
+    addTearDown(detailSubscription.close);
+    addTearDown(listSubscription.close);
+    addTearDown(container.dispose);
+
+    container
+        .read(applicationDetailViewModelProvider('revision').notifier)
+        .resubmitApplication();
+
+    final application = container
+        .read(applicationViewModelProvider)
+        .applications
+        .singleWhere((application) => application.id == 'revision');
+    expect(application.status, ApplicationProgressStatus.submitted);
+  });
+
   test('submitted 상세는 수정 보완 요청 notice를 표시하지 않는다', () {
     final submitted = mockApplicationDetails['submitted'];
 
@@ -67,6 +121,117 @@ void main() {
       expect(tester.takeException(), isNull);
     });
   }
+
+  testWidgets('제출 완료 상세에서 지원 취소를 누르면 취소 완료 상태로 전환된다', (tester) async {
+    await _pumpWidget(
+      tester,
+      const ProviderScope(
+        child: ApplicationDetailView(applicationId: 'submitted'),
+      ),
+    );
+
+    await tester.tap(find.byKey(const ValueKey('application-detail-withdraw')));
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const ValueKey('application-withdraw-confirm')),
+      findsOneWidget,
+    );
+
+    await tester.tap(
+      find.byKey(const ValueKey('application-withdraw-confirm')),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('취소'), findsOneWidget);
+    expect(find.text('취소 완료'), findsOneWidget);
+    expect(find.text('해당 지원이 취소되었습니다.'), findsOneWidget);
+    expect(find.text('지원 취소'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('application-detail-withdraw')),
+      findsNothing,
+    );
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('withdraw dialog close keeps submitted state', (tester) async {
+    await _pumpWidget(
+      tester,
+      const ProviderScope(
+        child: ApplicationDetailView(applicationId: 'submitted'),
+      ),
+    );
+
+    await tester.tap(find.byKey(const ValueKey('application-detail-withdraw')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('application-withdraw-close')));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byKey(const ValueKey('application-withdraw-confirm')),
+      findsNothing,
+    );
+    expect(
+      find.byKey(const ValueKey('application-detail-withdraw')),
+      findsOneWidget,
+    );
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('수정 요청 상세에서 웹 수정 재제출을 누르면 제출 완료 상태로 전환된다', (tester) async {
+    await _pumpWidget(
+      tester,
+      const ProviderScope(
+        child: ApplicationDetailView(applicationId: 'revision'),
+      ),
+    );
+
+    await tester.tap(find.byKey(const ValueKey('application-detail-resubmit')));
+    await tester.pump();
+
+    expect(find.text('제출 완료'), findsAtLeastNWidgets(1));
+    expect(find.text('재제출 완료'), findsOneWidget);
+    expect(find.text('수정·보완 요청'), findsNothing);
+    expect(
+      find.byKey(const ValueKey('application-detail-resubmit')),
+      findsNothing,
+    );
+    expect(
+      find.byKey(const ValueKey('application-detail-withdraw')),
+      findsOneWidget,
+    );
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('수정 요청 상세에서 지원 취소를 누르면 취소 완료 상태로 전환된다', (tester) async {
+    await _pumpWidget(
+      tester,
+      const ProviderScope(
+        child: ApplicationDetailView(applicationId: 'revision'),
+      ),
+    );
+
+    await tester.tap(find.byKey(const ValueKey('application-detail-withdraw')));
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const ValueKey('application-withdraw-confirm')),
+      findsOneWidget,
+    );
+
+    await tester.tap(
+      find.byKey(const ValueKey('application-withdraw-confirm')),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('취소'), findsOneWidget);
+    expect(find.text('취소 완료'), findsOneWidget);
+    expect(find.text('해당 지원이 취소되었습니다.'), findsOneWidget);
+    expect(find.text('지원 취소'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('application-detail-resubmit')),
+      findsNothing,
+    );
+    expect(tester.takeException(), isNull);
+  });
 
   testWidgets('로딩 상태를 표시한다', (tester) async {
     await _pumpState(tester, ApplicationDetailScreenStatus.loading);

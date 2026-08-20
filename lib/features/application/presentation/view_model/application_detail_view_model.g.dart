@@ -64,7 +64,7 @@ final class ApplicationDetailViewModelProvider
 }
 
 String _$applicationDetailViewModelHash() =>
-    r'f17ab2ad48d463985179cb848de345c4fec36263';
+    r'db5437183b57a1d58e0badf416312588b45ee397';
 
 final class ApplicationDetailViewModelFamily extends $Family
     with

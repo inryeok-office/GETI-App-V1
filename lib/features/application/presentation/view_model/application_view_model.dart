@@ -35,6 +35,17 @@ class ApplicationItem {
   final bool isDeleted;
 
   String get detailId => id;
+
+  ApplicationItem copyWith({ApplicationProgressStatus? status}) {
+    return ApplicationItem(
+      id: id,
+      companyName: companyName,
+      positionName: positionName,
+      status: status ?? this.status,
+      submittedDate: submittedDate,
+      isDeleted: isDeleted,
+    );
+  }
 }
 
 class ApplicationViewState {
@@ -104,6 +115,21 @@ class ApplicationViewModel extends _$ApplicationViewModel {
     await Future<void>.delayed(const Duration(milliseconds: 700));
     if (!ref.mounted) return;
     state = state.copyWith(screenStatus: ApplicationScreenStatus.loaded);
+  }
+
+  void updateApplicationStatus(
+    String applicationId,
+    ApplicationProgressStatus status,
+  ) {
+    state = state.copyWith(
+      applications: state.applications
+          .map(
+            (application) => application.id == applicationId
+                ? application.copyWith(status: status)
+                : application,
+          )
+          .toList(growable: false),
+    );
   }
 }
 
