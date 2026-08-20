@@ -107,7 +107,7 @@ class JobViewState {
   }
 
   List<JobItem> get bookmarkedJobs =>
-      jobs.where((job) => bookmarkedJobIds.contains(job.id)).toList();
+      _publishedJobs.where((job) => bookmarkedJobIds.contains(job.id)).toList();
 
   JobViewState copyWith({
     JobScreenStatus? screenStatus,

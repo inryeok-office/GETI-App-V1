@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:geti_app/features/job/presentation/view/job_bookmark_view.dart';
 import 'package:geti_app/features/job/presentation/view/job_detail_view.dart';
 import 'package:geti_app/features/job/presentation/view/job_view.dart';
+import 'package:geti_app/features/job/presentation/view_model/job_view_model.dart';
 import 'package:geti_app/shared/widgets/app_bottom_navigation.dart';
 import 'package:go_router/go_router.dart';
 import 'package:url_launcher_platform_interface/link.dart';
@@ -262,6 +263,24 @@ void main() {
 
     expect(find.text('북마크한 공고가 없습니다.'), findsOneWidget);
     expect(tester.takeException(), isNull);
+  });
+
+  test('비공개·삭제된 공고는 북마크되어 있어도 북마크 목록에 노출되지 않는다', () {
+    final container = ProviderContainer();
+    addTearDown(container.dispose);
+
+    final notifier = container.read(jobViewModelProvider.notifier);
+    notifier.toggleBookmark('hidden-internal-review');
+    notifier.toggleBookmark('removed-partner-role');
+    notifier.toggleBookmark('kepco-intern');
+
+    final bookmarkedIds = container
+        .read(jobViewModelProvider)
+        .bookmarkedJobs
+        .map((job) => job.id)
+        .toList();
+
+    expect(bookmarkedIds, ['kepco-intern']);
   });
 }
 
