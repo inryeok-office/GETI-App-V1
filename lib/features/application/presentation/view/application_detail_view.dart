@@ -47,8 +47,59 @@ class ApplicationDetailView extends ConsumerWidget {
           style: AppTypography.heading3.copyWith(color: AppColors.neutral900),
         ),
       ),
-      body: ApplicationDetailBody(state: state, onRetry: viewModel.retry),
+      body: ApplicationDetailBody(
+        state: state,
+        onRetry: viewModel.retry,
+        onWithdraw: () => _confirmWithdraw(context, viewModel),
+        onResubmit: viewModel.resubmitApplication,
+      ),
     );
+  }
+
+  Future<void> _confirmWithdraw(
+    BuildContext context,
+    ApplicationDetailViewModel viewModel,
+  ) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          backgroundColor: AppColors.surface,
+          surfaceTintColor: AppColors.surface,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          title: Text(
+            '지원을 취소하시겠습니까?',
+            style: AppTypography.heading3.copyWith(color: AppColors.neutral900),
+          ),
+          content: Text(
+            '재지원 시 이전에 제출한 답변과 첨부 파일은 자동으로 불러오지 않으며, 처음부터 다시 작성해야 합니다.',
+            style: AppTypography.body.copyWith(color: AppColors.neutral600),
+          ),
+          actions: [
+            TextButton(
+              key: const ValueKey('application-withdraw-close'),
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: Text(
+                '닫기',
+                style: AppTypography.label.copyWith(
+                  color: AppColors.neutral600,
+                ),
+              ),
+            ),
+            TextButton(
+              key: const ValueKey('application-withdraw-confirm'),
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              child: Text(
+                '지원 취소',
+                style: AppTypography.label.copyWith(color: AppColors.error),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+    if (confirmed != true || !context.mounted) return;
+    viewModel.withdrawApplication();
   }
 }
 
@@ -56,11 +107,15 @@ class ApplicationDetailBody extends StatelessWidget {
   const ApplicationDetailBody({
     required this.state,
     required this.onRetry,
+    required this.onWithdraw,
+    required this.onResubmit,
     super.key,
   });
 
   final ApplicationDetailViewState state;
   final VoidCallback onRetry;
+  final VoidCallback onWithdraw;
+  final VoidCallback onResubmit;
 
   @override
   Widget build(BuildContext context) {
@@ -104,16 +159,26 @@ class ApplicationDetailBody extends StatelessWidget {
         ),
         if (detail.variant == ApplicationDetailVariant.revisionRequested ||
             detail.variant == ApplicationDetailVariant.submitted)
-          _ApplicationDetailActions(variant: detail.variant),
+          _ApplicationDetailActions(
+            variant: detail.variant,
+            onWithdraw: onWithdraw,
+            onResubmit: onResubmit,
+          ),
       ],
     );
   }
 }
 
 class _ApplicationDetailActions extends StatelessWidget {
-  const _ApplicationDetailActions({required this.variant});
+  const _ApplicationDetailActions({
+    required this.variant,
+    required this.onWithdraw,
+    required this.onResubmit,
+  });
 
   final ApplicationDetailVariant variant;
+  final VoidCallback onWithdraw;
+  final VoidCallback onResubmit;
 
   @override
   Widget build(BuildContext context) {
@@ -128,33 +193,23 @@ class _ApplicationDetailActions extends StatelessWidget {
                   ? 114
                   : 1,
               child: _ActionButton(
+                key: const ValueKey('application-detail-withdraw'),
                 label: '지원 취소',
                 foregroundColor: AppColors.error,
                 borderColor: AppColors.error,
+                onTap: onWithdraw,
               ),
             ),
             if (variant == ApplicationDetailVariant.revisionRequested) ...[
               SizedBox(width: 16.w),
               Expanded(
                 flex: 196,
-                child: Container(
-                  height: 44.h,
-                  alignment: Alignment.center,
-                  decoration: BoxDecoration(
-                    color: AppColors.primary,
-                    borderRadius: BorderRadius.circular(8.r),
-                  ),
-                  child: Text(
-                    '웹에서 수정·재제출',
-                    style: TextStyle(
-                      fontFamily: 'Pretendard',
-                      fontSize: 14.sp,
-                      height: 1.4,
-                      fontWeight: FontWeight.w500,
-                      letterSpacing: -0.14.sp,
-                      color: AppColors.onPrimary,
-                    ),
-                  ),
+                child: _ActionButton(
+                  key: const ValueKey('application-detail-resubmit'),
+                  label: '웹에서 수정·재제출',
+                  foregroundColor: AppColors.onPrimary,
+                  backgroundColor: AppColors.primary,
+                  onTap: onResubmit,
                 ),
               ),
             ],
@@ -169,28 +224,41 @@ class _ActionButton extends StatelessWidget {
   const _ActionButton({
     required this.label,
     required this.foregroundColor,
+    required this.onTap,
+    this.backgroundColor = AppColors.surface,
     this.borderColor,
+    super.key,
   });
 
   final String label;
   final Color foregroundColor;
+  final Color backgroundColor;
   final Color? borderColor;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     return SizedBox(
       height: 44.h,
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          color: AppColors.surface,
-          border: borderColor == null ? null : Border.all(color: borderColor!),
-          borderRadius: BorderRadius.circular(8.r),
-        ),
-        child: Center(
-          child: Text(
-            label,
-            maxLines: 1,
-            style: AppTypography.label.copyWith(color: foregroundColor),
+      child: Material(
+        color: backgroundColor,
+        borderRadius: BorderRadius.circular(8.r),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: onTap,
+          child: Container(
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              border: borderColor == null
+                  ? null
+                  : Border.all(color: borderColor!),
+              borderRadius: BorderRadius.circular(8.r),
+            ),
+            child: Text(
+              label,
+              maxLines: 1,
+              style: AppTypography.label.copyWith(color: foregroundColor),
+            ),
           ),
         ),
       ),

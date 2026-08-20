@@ -47,9 +47,21 @@ class CompanyView extends ConsumerWidget {
                         ),
                       ),
                       SizedBox(height: 20.h),
-                      _CompanySearchField(
-                        query: state.searchQuery,
-                        onChanged: viewModel.updateSearchQuery,
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _CompanySearchField(
+                              query: state.searchQuery,
+                              onChanged: viewModel.updateSearchQuery,
+                            ),
+                          ),
+                          SizedBox(width: 12.w),
+                          _CompanyTypeFilterButton(
+                            selectedType: state.typeFilter,
+                            availableTypes: state.availableTypes,
+                            onSelected: viewModel.updateTypeFilter,
+                          ),
+                        ],
                       ),
                       SizedBox(height: 20.h),
                       Expanded(
@@ -135,6 +147,128 @@ class _CompanyList extends ConsumerWidget {
           onTap: () => onCompanyTap(company),
         );
       },
+    );
+  }
+}
+
+class _CompanyTypeFilterButton extends StatelessWidget {
+  const _CompanyTypeFilterButton({
+    required this.selectedType,
+    required this.availableTypes,
+    required this.onSelected,
+  });
+
+  final String? selectedType;
+  final List<String> availableTypes;
+  final ValueChanged<String?> onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      key: const ValueKey('company-type-filter'),
+      onTap: () => _showTypeFilterSheet(context),
+      borderRadius: BorderRadius.circular(8.r),
+      child: Container(
+        height: 56.h,
+        padding: EdgeInsets.symmetric(horizontal: 16.w),
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          border: Border.all(color: AppColors.neutral200),
+          borderRadius: BorderRadius.circular(8.r),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              '기업 유형 ${selectedType ?? '전체'}',
+              style: AppTypography.label.copyWith(color: AppColors.neutral600),
+            ),
+            SizedBox(width: 8.w),
+            Icon(Icons.expand_more, size: 20.w, color: AppColors.neutral600),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showTypeFilterSheet(BuildContext context) {
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: AppColors.surface,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16.r)),
+      ),
+      builder: (sheetContext) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            SizedBox(height: 12.h),
+            Text(
+              '기업 유형',
+              style: AppTypography.heading3.copyWith(
+                color: AppColors.neutral900,
+              ),
+            ),
+            SizedBox(height: 8.h),
+            _CompanyTypeOption(
+              label: '전체',
+              selected: selectedType == null,
+              onTap: () {
+                Navigator.of(sheetContext).pop();
+                onSelected(null);
+              },
+            ),
+            for (final type in availableTypes)
+              _CompanyTypeOption(
+                label: type,
+                selected: selectedType == type,
+                onTap: () {
+                  Navigator.of(sheetContext).pop();
+                  onSelected(type);
+                },
+              ),
+            SizedBox(height: 12.h),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _CompanyTypeOption extends StatelessWidget {
+  const _CompanyTypeOption({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      key: ValueKey('company-type-option-$label'),
+      onTap: onTap,
+      child: Padding(
+        padding: EdgeInsets.symmetric(horizontal: 24.w, vertical: 14.h),
+        child: Row(
+          children: [
+            Expanded(
+              child: Text(
+                label,
+                style: AppTypography.bodyLarge.copyWith(
+                  color: selected ? AppColors.primary : AppColors.neutral900,
+                  fontWeight: selected ? FontWeight.w700 : FontWeight.w400,
+                ),
+              ),
+            ),
+            if (selected)
+              Icon(Icons.check, size: 20.w, color: AppColors.primary),
+          ],
+        ),
+      ),
     );
   }
 }

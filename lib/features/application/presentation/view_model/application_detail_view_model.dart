@@ -1,5 +1,7 @@
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
+import 'application_view_model.dart';
+
 part 'application_detail_view_model.g.dart';
 
 enum ApplicationDetailScreenStatus { loaded, loading, empty, networkError }
@@ -51,6 +53,30 @@ class ApplicationDetail {
   final List<ApplicationStatusHistory> history;
   final String? noticeTitle;
   final String? noticeDescription;
+
+  ApplicationDetail copyWith({
+    ApplicationDetailVariant? variant,
+    List<ApplicationStatusHistory>? history,
+    String? noticeTitle,
+    String? noticeDescription,
+    bool clearNotice = false,
+  }) {
+    return ApplicationDetail(
+      id: id,
+      companyName: companyName,
+      positionName: positionName,
+      variant: variant ?? this.variant,
+      submittedAt: submittedAt,
+      answer: answer,
+      fileName: fileName,
+      fileDescription: fileDescription,
+      history: history ?? this.history,
+      noticeTitle: clearNotice ? null : (noticeTitle ?? this.noticeTitle),
+      noticeDescription: clearNotice
+          ? null
+          : (noticeDescription ?? this.noticeDescription),
+    );
+  }
 }
 
 class ApplicationDetailViewState {
@@ -95,6 +121,64 @@ class ApplicationDetailViewModel extends _$ApplicationDetailViewModel {
           ? ApplicationDetailScreenStatus.empty
           : ApplicationDetailScreenStatus.loaded,
     );
+  }
+
+  void withdrawApplication() {
+    final detail = state.detail;
+    if (detail == null ||
+        (detail.variant != ApplicationDetailVariant.submitted &&
+            detail.variant != ApplicationDetailVariant.revisionRequested)) {
+      return;
+    }
+
+    state = state.copyWith(
+      detail: detail.copyWith(
+        variant: ApplicationDetailVariant.cancelled,
+        history: [
+          ...detail.history,
+          const ApplicationStatusHistory(
+            label: '지원 취소',
+            occurredAt: '08.08 15:20',
+          ),
+        ],
+        noticeTitle: '취소 완료',
+        noticeDescription: '해당 지원이 취소되었습니다.',
+      ),
+    );
+    ref
+        .read(applicationViewModelProvider.notifier)
+        .updateApplicationStatus(
+          detail.id,
+          ApplicationProgressStatus.cancelled,
+        );
+  }
+
+  void resubmitApplication() {
+    final detail = state.detail;
+    if (detail == null ||
+        detail.variant != ApplicationDetailVariant.revisionRequested) {
+      return;
+    }
+
+    state = state.copyWith(
+      detail: detail.copyWith(
+        variant: ApplicationDetailVariant.submitted,
+        history: [
+          ...detail.history,
+          const ApplicationStatusHistory(
+            label: '재제출 완료',
+            occurredAt: '08.02 09:30',
+          ),
+        ],
+        clearNotice: true,
+      ),
+    );
+    ref
+        .read(applicationViewModelProvider.notifier)
+        .updateApplicationStatus(
+          detail.id,
+          ApplicationProgressStatus.submitted,
+        );
   }
 }
 

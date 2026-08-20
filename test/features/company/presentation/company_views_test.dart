@@ -45,6 +45,42 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('기업 유형 필터로 목록을 좁힐 수 있다', (tester) async {
+    await _pumpRoute(tester, '/companies');
+
+    expect(find.text('기업 유형 전체'), findsOneWidget);
+
+    await tester.tap(find.byKey(const ValueKey('company-type-filter')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('company-type-option-대기업')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('기업 유형 대기업'), findsOneWidget);
+    expect(find.text('네이버클라우드'), findsOneWidget);
+    expect(find.text('카카오'), findsOneWidget);
+    expect(find.text('우아한형제들'), findsNothing);
+    expect(find.text('한국전력공사'), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('기업 유형 필터와 검색어를 함께 적용하면 결과가 없을 수 있다', (tester) async {
+    await _pumpRoute(tester, '/companies');
+
+    await tester.tap(find.byKey(const ValueKey('company-type-filter')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('company-type-option-공기업')));
+    await tester.pumpAndSettle();
+
+    await tester.enterText(
+      find.byKey(const ValueKey('company-search-field')),
+      '카카',
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('검색 결과가 없습니다.'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('목록에서 채용 중인 공고가 있는 기업은 개수가 표시되고, 탭하면 상세로 이동한다', (tester) async {
     await _pumpRoute(tester, '/companies');
 
