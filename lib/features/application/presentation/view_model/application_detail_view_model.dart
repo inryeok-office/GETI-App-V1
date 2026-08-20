@@ -1,5 +1,7 @@
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
+import 'application_view_model.dart';
+
 part 'application_detail_view_model.g.dart';
 
 enum ApplicationDetailScreenStatus { loaded, loading, empty, networkError }
@@ -143,6 +145,12 @@ class ApplicationDetailViewModel extends _$ApplicationDetailViewModel {
         noticeDescription: '해당 지원이 취소되었습니다.',
       ),
     );
+    ref
+        .read(applicationViewModelProvider.notifier)
+        .updateApplicationStatus(
+          detail.id,
+          ApplicationProgressStatus.cancelled,
+        );
   }
 
   void resubmitApplication() {
@@ -165,6 +173,12 @@ class ApplicationDetailViewModel extends _$ApplicationDetailViewModel {
         clearNotice: true,
       ),
     );
+    ref
+        .read(applicationViewModelProvider.notifier)
+        .updateApplicationStatus(
+          detail.id,
+          ApplicationProgressStatus.submitted,
+        );
   }
 }
 

@@ -50,10 +50,56 @@ class ApplicationDetailView extends ConsumerWidget {
       body: ApplicationDetailBody(
         state: state,
         onRetry: viewModel.retry,
-        onWithdraw: viewModel.withdrawApplication,
+        onWithdraw: () => _confirmWithdraw(context, viewModel),
         onResubmit: viewModel.resubmitApplication,
       ),
     );
+  }
+
+  Future<void> _confirmWithdraw(
+    BuildContext context,
+    ApplicationDetailViewModel viewModel,
+  ) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          backgroundColor: AppColors.surface,
+          surfaceTintColor: AppColors.surface,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          title: Text(
+            '지원을 취소하시겠습니까?',
+            style: AppTypography.heading3.copyWith(color: AppColors.neutral900),
+          ),
+          content: Text(
+            '재지원 시 이전에 제출한 답변과 첨부 파일은 자동으로 불러오지 않으며, 처음부터 다시 작성해야 합니다.',
+            style: AppTypography.body.copyWith(color: AppColors.neutral600),
+          ),
+          actions: [
+            TextButton(
+              key: const ValueKey('application-withdraw-close'),
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: Text(
+                '닫기',
+                style: AppTypography.label.copyWith(
+                  color: AppColors.neutral600,
+                ),
+              ),
+            ),
+            TextButton(
+              key: const ValueKey('application-withdraw-confirm'),
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              child: Text(
+                '지원 취소',
+                style: AppTypography.label.copyWith(color: AppColors.error),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+    if (confirmed != true || !context.mounted) return;
+    viewModel.withdrawApplication();
   }
 }
 
