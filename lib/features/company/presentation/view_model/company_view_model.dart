@@ -20,22 +20,34 @@ class CompanyItem {
   final bool isMou;
 }
 
+/// null은 "전체"를 의미합니다.
+typedef CompanyTypeFilter = String?;
+
 class CompanyViewState {
   const CompanyViewState({
     this.screenStatus = CompanyScreenStatus.loaded,
     this.companies = mockCompanies,
     this.searchQuery = '',
+    this.typeFilter,
   });
 
   final CompanyScreenStatus screenStatus;
   final List<CompanyItem> companies;
   final String searchQuery;
+  final CompanyTypeFilter typeFilter;
+
+  List<String> get availableTypes =>
+      companies.map((company) => company.typeLabel).toSet().toList();
 
   List<CompanyItem> get visibleCompanies {
     final query = searchQuery.trim();
-    if (query.isEmpty) return companies;
     return companies
-        .where((company) => company.name.contains(query))
+        .where((company) {
+          final matchesQuery = query.isEmpty || company.name.contains(query);
+          final matchesType =
+              typeFilter == null || company.typeLabel == typeFilter;
+          return matchesQuery && matchesType;
+        })
         .toList(growable: false);
   }
 
@@ -43,10 +55,13 @@ class CompanyViewState {
     CompanyScreenStatus? screenStatus,
     List<CompanyItem>? companies,
     String? searchQuery,
+    bool clearTypeFilter = false,
+    CompanyTypeFilter? typeFilter,
   }) => CompanyViewState(
     screenStatus: screenStatus ?? this.screenStatus,
     companies: companies ?? this.companies,
     searchQuery: searchQuery ?? this.searchQuery,
+    typeFilter: clearTypeFilter ? null : (typeFilter ?? this.typeFilter),
   );
 }
 
@@ -57,6 +72,10 @@ class CompanyViewModel extends _$CompanyViewModel {
 
   void updateSearchQuery(String query) =>
       state = state.copyWith(searchQuery: query);
+
+  void updateTypeFilter(String? type) => state = type == null
+      ? state.copyWith(clearTypeFilter: true)
+      : state.copyWith(typeFilter: type);
 
   Future<void> retry() async {
     state = state.copyWith(screenStatus: CompanyScreenStatus.loading);
