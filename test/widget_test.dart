@@ -4,6 +4,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:geti_app/app/app.dart';
 import 'package:geti_app/core/network/session_provider.dart';
+import 'package:geti_app/features/auth/presentation/view_model/auth_view_model.dart';
 import 'package:geti_app/shared/theme/app_colors.dart';
 
 void main() {
@@ -75,6 +76,7 @@ void main() {
 
     expect(find.text('로그인이 만료되었습니다.'), findsOneWidget);
     expect(container.read(sessionExpiredProvider), isFalse);
+    expect(container.read(authViewModelProvider).loginResult, isNull);
     expect(tester.takeException(), isNull);
   });
 }
