@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:geti_app/features/job/presentation/view/job_bookmark_view.dart';
 import 'package:geti_app/features/job/presentation/view/job_detail_view.dart';
 import 'package:geti_app/features/job/presentation/view/job_view.dart';
+import 'package:geti_app/features/job/presentation/view_model/job_detail_view_model.dart';
 import 'package:geti_app/shared/widgets/app_bottom_navigation.dart';
 import 'package:go_router/go_router.dart';
 
@@ -149,6 +150,42 @@ void main() {
       findsOneWidget,
     );
     expect(tester.takeException(), isNull);
+  });
+
+  test('재시도 결과 mock이 없으면 재분석 중에 멈추지 않고 이전 상태로 돌아간다', () async {
+    final container = ProviderContainer();
+    addTearDown(container.dispose);
+
+    final notifier = container.read(
+      jobDetailViewModelProvider('analysis-failed-no-retry-mock').notifier,
+    );
+
+    expect(
+      container
+          .read(jobDetailViewModelProvider('analysis-failed-no-retry-mock'))
+          .aiAnalysis
+          ?.status,
+      JobAiAnalysisStatus.failed,
+    );
+
+    final retryFuture = notifier.retryAiAnalysis();
+    expect(
+      container
+          .read(jobDetailViewModelProvider('analysis-failed-no-retry-mock'))
+          .aiAnalysis
+          ?.status,
+      JobAiAnalysisStatus.reanalyzing,
+    );
+
+    await retryFuture;
+
+    expect(
+      container
+          .read(jobDetailViewModelProvider('analysis-failed-no-retry-mock'))
+          .aiAnalysis
+          ?.status,
+      JobAiAnalysisStatus.failed,
+    );
   });
 
   testWidgets('재분석 중에는 로딩 아이콘 회전 애니메이션이 실제로 재생된다', (tester) async {

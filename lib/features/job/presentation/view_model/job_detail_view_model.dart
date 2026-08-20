@@ -107,13 +107,14 @@ class JobDetailViewModel extends _$JobDetailViewModel {
   /// AI 분석 실패 상태에서 재시도를 흉내내는 Mock 동작입니다.
   /// 실제 AI 분석 API 연동은 별도 Issue에서 구현합니다.
   Future<void> retryAiAnalysis() async {
+    final previousAiAnalysis = state.aiAnalysis;
     state = state.copyWith(
       aiAnalysis: const JobAiAnalysis(status: JobAiAnalysisStatus.reanalyzing),
     );
     await Future<void>.delayed(const Duration(milliseconds: 800));
     if (!ref.mounted) return;
     state = state.copyWith(
-      aiAnalysis: mockRetriedAiAnalysis[jobId] ?? state.aiAnalysis,
+      aiAnalysis: mockRetriedAiAnalysis[jobId] ?? previousAiAnalysis,
     );
   }
 }
@@ -200,6 +201,21 @@ const mockJobDetails = <String, JobDetail>{
     ],
     hiringProcess: ['서류 심사', '포트폴리오 심사', '면접', '최종 합격'],
     aiAnalysis: JobAiAnalysis(status: JobAiAnalysisStatus.insufficientInfo),
+  ),
+  // 목록(mockJobs)에는 대응하는 JobItem이 없어 실제 화면에서는 도달할 수
+  // 없습니다. mockRetriedAiAnalysis에 결과가 없을 때 retryAiAnalysis()가
+  // reanalyzing에 멈추지 않고 이전 상태로 되돌아가는지 검증하기 위한
+  // 테스트 전용 Mock입니다.
+  'analysis-failed-no-retry-mock': JobDetail(
+    recruitmentPeriod: '2026.07.01 ~ 2026.08.14',
+    applicationTypeLabel: '외부 지원',
+    description: 'retryAiAnalysis()의 fallback 동작을 검증하기 위한 테스트 전용 Mock입니다.',
+    responsibilities: [],
+    qualifications: [],
+    preferredQualifications: [],
+    workConditions: [],
+    hiringProcess: [],
+    aiAnalysis: JobAiAnalysis(status: JobAiAnalysisStatus.failed),
   ),
 };
 
