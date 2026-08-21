@@ -6,6 +6,7 @@ import 'package:geti_app/features/program/presentation/view/program_detail_view.
 import 'package:geti_app/features/program/presentation/view/program_view.dart';
 import 'package:geti_app/features/program/presentation/view_model/program_detail_view_model.dart';
 import 'package:geti_app/features/program/presentation/view_model/program_type.dart';
+import 'package:geti_app/features/program/presentation/view_model/program_view_model.dart';
 import 'package:geti_app/features/program/presentation/widgets/program_card.dart';
 import 'package:geti_app/shared/widgets/app_bottom_navigation.dart';
 import 'package:go_router/go_router.dart';
@@ -163,6 +164,23 @@ void main() {
           .operationalStatus,
       ProgramOperationalStatus.deleted,
     );
+  });
+
+  test('목록과 상세 Mock은 같은 프로그램 유형을 사용한다', () {
+    expect(mockProgramDetails, hasLength(mockPrograms.length));
+
+    for (final program in mockPrograms) {
+      expect(
+        mockProgramDetails[program.id]?.type,
+        program.type,
+        reason: '${program.id}의 목록/상세 유형이 일치해야 한다.',
+      );
+    }
+
+    expect(mockProgramDetails.values.map((detail) => detail.type).toSet(), {
+      ProgramType.specialLecture,
+      ProgramType.education,
+    });
   });
 
   testWidgets('상세는 SPECIAL_LECTURE 유형을 Figma 라벨로 표시한다', (tester) async {
@@ -468,6 +486,7 @@ void main() {
           id: actionCase.key.name,
           title: '테스트 프로그램',
           actionStatus: actionCase.key,
+          type: ProgramType.specialLecture,
         ),
       );
 

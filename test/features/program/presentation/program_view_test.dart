@@ -18,10 +18,16 @@ void main() {
     await _pumpView(tester);
     expect(mockPrograms, hasLength(7));
     expect(
-      mockPrograms.every(
-        (program) => program.type == ProgramType.specialLecture,
-      ),
-      isTrue,
+      {for (final program in mockPrograms) program.id: program.type},
+      {
+        'applied': ProgramType.specialLecture,
+        'cancelled': ProgramType.specialLecture,
+        'deleted': ProgramType.specialLecture,
+        'full': ProgramType.education,
+        'upcoming': ProgramType.education,
+        'closed': ProgramType.education,
+        'available': ProgramType.specialLecture,
+      },
     );
     expect(find.byType(ProgramCard), findsWidgets);
     final home = tester.widget<Semantics>(
