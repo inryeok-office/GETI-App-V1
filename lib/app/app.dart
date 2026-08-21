@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:geti_app/app/router/app_router.dart';
+import 'package:geti_app/core/network/session_provider.dart';
+import 'package:geti_app/features/auth/presentation/view_model/auth_view_model.dart';
 import 'package:geti_app/shared/theme/app_theme.dart';
 import 'package:responsive_framework/responsive_framework.dart';
 
@@ -11,6 +13,14 @@ class GetiApp extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final router = ref.watch(appRouterProvider);
+
+    ref.listen(sessionExpiredProvider, (previous, isExpired) {
+      if (isExpired) {
+        ref.read(authViewModelProvider.notifier).reset();
+        router.go('/relogin');
+        ref.read(sessionExpiredProvider.notifier).acknowledge();
+      }
+    });
 
     return ScreenUtilInit(
       designSize: const Size(390, 844),

@@ -15,7 +15,7 @@ void navigateToBottomTab(BuildContext context, int index) {
     case 2:
       context.go('/notifications');
     case 3:
-      context.go('/applications');
+      context.go('/mypage');
   }
 }
 

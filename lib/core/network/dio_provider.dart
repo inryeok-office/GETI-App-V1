@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 import 'package:geti_app/core/config/app_config.dart';
+import 'package:geti_app/core/network/session_provider.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 part 'dio_provider.g.dart';
@@ -18,6 +19,16 @@ Dio dio(Ref ref) {
   }
 
   final client = Dio(options);
+  client.interceptors.add(
+    InterceptorsWrapper(
+      onError: (error, handler) {
+        if (error.response?.statusCode == 401) {
+          ref.read(sessionExpiredProvider.notifier).notifyExpired();
+        }
+        handler.next(error);
+      },
+    ),
+  );
   ref.onDispose(() => client.close(force: true));
   return client;
 }
