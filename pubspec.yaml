@@ -47,6 +47,7 @@ dependencies:
   retrofit: ^4.9.2
   riverpod_annotation: 4.0.2
   shared_preferences: ^2.5.5
+  url_launcher: ^6.3.2
 
 dev_dependencies:
   # 2.15.2+ requires an analyzer/meta combination newer than Flutter 3.44.6.
@@ -65,6 +66,7 @@ dev_dependencies:
   json_serializable: 6.13.0
   retrofit_generator: ^10.2.8
   riverpod_generator: 4.0.3
+  url_launcher_platform_interface: ^2.3.2
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
