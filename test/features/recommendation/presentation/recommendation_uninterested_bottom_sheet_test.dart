@@ -4,6 +4,7 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:geti_app/app/app.dart';
 import 'package:geti_app/features/recommendation/presentation/view_model/recommendation_view_model.dart';
+import 'package:geti_app/features/recommendation/presentation/view_model/suitability_level.dart';
 import 'package:geti_app/features/recommendation/presentation/widgets/recommendation_uninterested_bottom_sheet.dart';
 
 void main() {
@@ -223,7 +224,7 @@ const _job = RecommendationJob(
   summary: '분당 · 정규직 · D-18',
   tags: ['React', 'TypeScript'],
   availability: RecommendationJobAvailability.active,
-  fitLabel: '매우 적합',
+  suitabilityLevel: SuitabilityLevel.highlyRecommended,
   matchReason: 'React, TypeScript 기술 스택과 일치합니다.',
 );
 

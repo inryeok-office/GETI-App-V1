@@ -94,6 +94,10 @@ class NotificationViewModel extends _$NotificationViewModel {
     );
   }
 
+  void handleNotificationTap(NotificationItem notification) {
+    markAsRead(notification.id);
+  }
+
   void markAllAsRead() {
     state = state.copyWith(
       notifications: [

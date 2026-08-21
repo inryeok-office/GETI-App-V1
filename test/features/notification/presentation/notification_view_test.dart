@@ -201,16 +201,17 @@ void main() {
     expect(notificationNavigation.properties.selected, isTrue);
   });
 
-  testWidgets('삭제된 대상 알림도 탭하면 읽음 처리 후 상태 화면으로 이동한다', (tester) async {
+  testWidgets('일반 알림 Tap은 ViewModel Handler에서 읽음 처리하고 이동하지 않는다', (
+    tester,
+  ) async {
     const initialState = NotificationViewState(
       notifications: [
         NotificationItem(
-          id: 'unread-deleted-target',
-          title: '프로그램 신청이 완료되었습니다.',
-          description: '프론트엔드 특강 신청이 완료되었습니다.',
+          id: 'unread-general-target',
+          title: '지원 상태가 변경되었습니다.',
+          description: '토스페이먼츠 지원서가 검토 중으로 변경되었습니다.',
           time: '방금',
           isRead: false,
-          targetState: NotificationTargetState.deleted,
         ),
       ],
     );
@@ -229,13 +230,6 @@ void main() {
         GoRoute(
           path: '/notifications',
           builder: (context, state) => const NotificationView(),
-          routes: [
-            GoRoute(
-              path: 'deleted',
-              builder: (context, state) =>
-                  const NotificationTargetDeletedView(),
-            ),
-          ],
         ),
       ],
     );
@@ -244,11 +238,12 @@ void main() {
     await _pumpRouter(tester, router, container: container);
     expect(container.read(notificationViewModelProvider).unreadCount, 1);
 
-    await tester.tap(find.text('프로그램 신청이 완료되었습니다.'));
+    await tester.tap(find.text('지원 상태가 변경되었습니다.'));
     await tester.pumpAndSettle();
 
     expect(container.read(notificationViewModelProvider).unreadCount, 0);
-    expect(find.text('삭제된 항목이에요.'), findsOneWidget);
+    expect(router.state.uri.path, '/notifications');
+    expect(find.text('지원 상태가 변경되었습니다.'), findsOneWidget);
   });
 
   testWidgets('대상 삭제 Route에서 알림 목록으로 돌아간다', (tester) async {

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:geti_app/features/recommendation/presentation/view_model/recommendation_view_model.dart';
+import 'package:geti_app/features/recommendation/presentation/view_model/suitability_level.dart';
 import 'package:geti_app/shared/theme/app_colors.dart';
 import 'package:geti_app/shared/theme/app_typography.dart';
 
@@ -23,6 +24,8 @@ class RecommendationJobCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final fitLabel = job.suitabilityLevel?.figmaLabel;
+
     return Container(
       width: double.infinity,
       padding: EdgeInsets.all(16.w),
@@ -95,8 +98,10 @@ class RecommendationJobCard extends StatelessWidget {
             else
               Row(
                 children: [
-                  _FitBadge(label: job.fitLabel ?? ''),
-                  SizedBox(width: 16.w),
+                  if (fitLabel != null) ...[
+                    _FitBadge(label: fitLabel),
+                    SizedBox(width: 16.w),
+                  ],
                   Expanded(
                     child: Align(
                       alignment: Alignment.centerLeft,
