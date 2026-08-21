@@ -1,5 +1,7 @@
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
+import 'program_type.dart';
+
 part 'program_detail_view_model.g.dart';
 
 enum ProgramDetailActionStatus {
@@ -36,8 +38,8 @@ class ProgramDetail {
     required this.id,
     required this.title,
     required this.actionStatus,
+    required this.type,
     this.operationalStatus = ProgramOperationalStatus.active,
-    this.category = '특강',
     this.recruitmentBadge = '모집 중',
     this.applicationPeriod = '신청 08.01–08.10',
     this.viewCount = '조회수 128',
@@ -60,7 +62,7 @@ class ProgramDetail {
   final String title;
   final ProgramDetailActionStatus actionStatus;
   final ProgramOperationalStatus operationalStatus;
-  final String category;
+  final ProgramType type;
   final String recruitmentBadge;
   final String applicationPeriod;
   final String viewCount;
@@ -77,6 +79,7 @@ class ProgramDetail {
   final String applicationSubmittedAt;
   final String programStatusChangedAt;
   final String programCancellationReason;
+  String get typeLabel => type.label;
 
   ProgramDetail copyWith({
     ProgramDetailActionStatus? actionStatus,
@@ -87,7 +90,7 @@ class ProgramDetail {
       title: title,
       actionStatus: actionStatus ?? this.actionStatus,
       operationalStatus: operationalStatus ?? this.operationalStatus,
-      category: category,
+      type: type,
       recruitmentBadge: recruitmentBadge,
       applicationPeriod: applicationPeriod,
       viewCount: viewCount,
@@ -213,37 +216,44 @@ const mockProgramDetails = <String, ProgramDetail>{
     id: 'available',
     title: '현직자와 함께하는 프론트엔드 특강',
     actionStatus: ProgramDetailActionStatus.available,
+    type: ProgramType.specialLecture,
   ),
   'upcoming': ProgramDetail(
     id: 'upcoming',
     title: '포트폴리오 1:1 멘토링',
     actionStatus: ProgramDetailActionStatus.upcoming,
+    type: ProgramType.education,
   ),
   'full': ProgramDetail(
     id: 'full',
     title: '2026 하반기 취업 전략 설명회',
     actionStatus: ProgramDetailActionStatus.full,
+    type: ProgramType.education,
   ),
   'closed': ProgramDetail(
     id: 'closed',
     title: '포트폴리오 1:1 멘토링',
     actionStatus: ProgramDetailActionStatus.closed,
+    type: ProgramType.education,
   ),
   'applied': ProgramDetail(
     id: 'applied',
     title: '현직자와 함께하는 프론트엔드 특강',
     actionStatus: ProgramDetailActionStatus.applied,
+    type: ProgramType.specialLecture,
   ),
   'cancelled': ProgramDetail(
     id: 'cancelled',
     title: '현직자와 함께하는 프론트엔드 특강',
     actionStatus: ProgramDetailActionStatus.applied,
+    type: ProgramType.specialLecture,
     operationalStatus: ProgramOperationalStatus.cancelled,
   ),
   'deleted': ProgramDetail(
     id: 'deleted',
     title: '삭제된 프로그램입니다.',
     actionStatus: ProgramDetailActionStatus.applied,
+    type: ProgramType.specialLecture,
     operationalStatus: ProgramOperationalStatus.deleted,
   ),
 };

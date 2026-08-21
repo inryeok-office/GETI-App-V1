@@ -17,7 +17,7 @@ class ProgramDetailSummary extends StatelessWidget {
           spacing: 8.w,
           runSpacing: 8.h,
           children: [
-            _Badge(label: detail.category),
+            _Badge(label: detail.typeLabel),
             _Badge(label: detail.recruitmentBadge),
           ],
         ),
@@ -196,7 +196,7 @@ class _CancelledProgramSummary extends StatelessWidget {
         runSpacing: 8.h,
         children: [
           _StatusPill(
-            label: detail.category,
+            label: detail.typeLabel,
             backgroundColor: AppColors.primarySubtle,
             textColor: AppColors.primary,
           ),

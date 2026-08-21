@@ -1,4 +1,7 @@
 import 'package:riverpod_annotation/riverpod_annotation.dart';
+
+import 'program_type.dart';
+
 part 'program_view_model.g.dart';
 
 enum ProgramScreenStatus { loaded, loading, networkError }
@@ -22,6 +25,7 @@ class ProgramItem {
     required this.location,
     required this.applicationPeriod,
     required this.status,
+    required this.type,
     this.isApplied = false,
   });
   final String id;
@@ -30,6 +34,7 @@ class ProgramItem {
   final String location;
   final String applicationPeriod;
   final ProgramRecruitmentStatus status;
+  final ProgramType type;
   final bool isApplied;
 }
 
@@ -79,6 +84,7 @@ const mockPrograms = [
     location: '광주소프트웨어마이스터고 시청각실',
     applicationPeriod: '2026.07.20 – 2026.08.10',
     status: ProgramRecruitmentStatus.recruiting,
+    type: ProgramType.specialLecture,
     isApplied: true,
   ),
   ProgramItem(
@@ -88,6 +94,7 @@ const mockPrograms = [
     location: '광주소프트웨어마이스터고 시청각실',
     applicationPeriod: '2026.07.20 – 2026.08.10',
     status: ProgramRecruitmentStatus.cancelled,
+    type: ProgramType.specialLecture,
     isApplied: true,
   ),
   ProgramItem(
@@ -97,6 +104,7 @@ const mockPrograms = [
     location: '광주소프트웨어마이스터고 시청각실',
     applicationPeriod: '2026.07.20 – 2026.08.10',
     status: ProgramRecruitmentStatus.deleted,
+    type: ProgramType.specialLecture,
     isApplied: true,
   ),
   ProgramItem(
@@ -106,6 +114,7 @@ const mockPrograms = [
     location: '광주소프트웨어마이스터고 시청각실',
     applicationPeriod: '2026.07.20 – 2026.08.15',
     status: ProgramRecruitmentStatus.full,
+    type: ProgramType.education,
   ),
   ProgramItem(
     id: 'upcoming',
@@ -114,6 +123,7 @@ const mockPrograms = [
     location: '광주소프트웨어마이스터고 시청각실',
     applicationPeriod: '2026.08.01 – 2026.08.20',
     status: ProgramRecruitmentStatus.upcoming,
+    type: ProgramType.education,
   ),
   ProgramItem(
     id: 'closed',
@@ -122,6 +132,7 @@ const mockPrograms = [
     location: '광주소프트웨어마이스터고 시청각실',
     applicationPeriod: '2026.08.01 – 2026.08.20',
     status: ProgramRecruitmentStatus.closed,
+    type: ProgramType.education,
   ),
   ProgramItem(
     id: 'available',
@@ -130,5 +141,6 @@ const mockPrograms = [
     location: '광주소프트웨어마이스터고 시청각실',
     applicationPeriod: '2026.07.20 – 2026.08.10',
     status: ProgramRecruitmentStatus.recruiting,
+    type: ProgramType.specialLecture,
   ),
 ];

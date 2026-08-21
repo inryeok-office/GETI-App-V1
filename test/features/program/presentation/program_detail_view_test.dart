@@ -5,6 +5,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:geti_app/features/program/presentation/view/program_detail_view.dart';
 import 'package:geti_app/features/program/presentation/view/program_view.dart';
 import 'package:geti_app/features/program/presentation/view_model/program_detail_view_model.dart';
+import 'package:geti_app/features/program/presentation/view_model/program_type.dart';
+import 'package:geti_app/features/program/presentation/view_model/program_view_model.dart';
 import 'package:geti_app/features/program/presentation/widgets/program_card.dart';
 import 'package:geti_app/shared/widgets/app_bottom_navigation.dart';
 import 'package:go_router/go_router.dart';
@@ -162,6 +164,53 @@ void main() {
           .operationalStatus,
       ProgramOperationalStatus.deleted,
     );
+  });
+
+  test('목록과 상세 Mock은 같은 프로그램 유형을 사용한다', () {
+    expect(mockProgramDetails, hasLength(mockPrograms.length));
+
+    for (final program in mockPrograms) {
+      expect(
+        mockProgramDetails[program.id]?.type,
+        program.type,
+        reason: '${program.id}의 목록/상세 유형이 일치해야 한다.',
+      );
+    }
+
+    expect(mockProgramDetails.values.map((detail) => detail.type).toSet(), {
+      ProgramType.specialLecture,
+      ProgramType.education,
+    });
+  });
+
+  testWidgets('상세는 SPECIAL_LECTURE 유형을 Figma 라벨로 표시한다', (tester) async {
+    await _pumpBody(
+      tester,
+      const ProgramDetail(
+        id: 'specialLecture',
+        title: '현직자와 함께하는 프론트엔드 특강',
+        actionStatus: ProgramDetailActionStatus.available,
+        type: ProgramType.specialLecture,
+      ),
+    );
+
+    expect(find.text('특강'), findsOneWidget);
+    expect(find.text('모집 중'), findsOneWidget);
+  });
+
+  testWidgets('상세는 EDUCATION 유형도 같은 배지 위치에서 표시할 수 있다', (tester) async {
+    await _pumpBody(
+      tester,
+      const ProgramDetail(
+        id: 'education',
+        title: '취업 교육 프로그램',
+        actionStatus: ProgramDetailActionStatus.available,
+        type: ProgramType.education,
+      ),
+    );
+
+    expect(find.text('교육'), findsOneWidget);
+    expect(find.text('모집 중'), findsOneWidget);
   });
 
   test('신청 처리 중에는 중복 신청을 실행하지 않고 완료 상태로 전환한다', () async {
@@ -437,6 +486,7 @@ void main() {
           id: actionCase.key.name,
           title: '테스트 프로그램',
           actionStatus: actionCase.key,
+          type: ProgramType.specialLecture,
         ),
       );
 
