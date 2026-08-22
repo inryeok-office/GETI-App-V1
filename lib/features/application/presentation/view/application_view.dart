@@ -29,6 +29,7 @@ class ApplicationView extends ConsumerWidget {
                 state: state,
                 onFilterSelected: viewModel.selectFilter,
                 onRetry: viewModel.retry,
+                onBrowseJobs: () => context.go('/jobs'),
               ),
             ),
           ],

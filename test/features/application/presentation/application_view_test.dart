@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:geti_app/features/application/presentation/view/application_view.dart';
 import 'package:geti_app/features/application/presentation/view_model/application_view_model.dart';
 import 'package:geti_app/features/application/presentation/widgets/application_card.dart';
+import 'package:go_router/go_router.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -181,6 +182,61 @@ void main() {
     await tester.tap(find.text('새로운 공고 둘러보기'));
     expect(browseJobsRequested, isTrue);
   });
+
+  testWidgets('empty application CTA navigates to the jobs route', (
+    tester,
+  ) async {
+    await _setViewport(tester);
+    final container = ProviderContainer(
+      overrides: [
+        applicationViewModelProvider.overrideWith(
+          _EmptyApplicationViewModel.new,
+        ),
+      ],
+    );
+    addTearDown(container.dispose);
+
+    final router = GoRouter(
+      initialLocation: '/applications',
+      routes: [
+        GoRoute(
+          path: '/applications',
+          builder: (context, state) => const ApplicationView(),
+        ),
+        GoRoute(
+          path: '/jobs',
+          builder: (context, state) =>
+              const Scaffold(body: SizedBox(key: ValueKey('jobs-route'))),
+        ),
+      ],
+    );
+    addTearDown(router.dispose);
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: ScreenUtilInit(
+          designSize: const Size(390, 844),
+          builder: (context, _) => MaterialApp.router(routerConfig: router),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byType(FilledButton));
+    await tester.pumpAndSettle();
+
+    expect(router.state.uri.path, '/jobs');
+    expect(find.byKey(const ValueKey('jobs-route')), findsOneWidget);
+  });
+}
+
+class _EmptyApplicationViewModel extends ApplicationViewModel {
+  @override
+  ApplicationViewState build() => const ApplicationViewState(
+    screenStatus: ApplicationScreenStatus.empty,
+    applications: [],
+  );
 }
 
 Future<void> _pumpApplicationView(
