@@ -30,7 +30,12 @@ class NotificationView extends ConsumerWidget {
                 onFilterSelected: viewModel.selectFilter,
                 onMarkAllAsRead: viewModel.markAllAsRead,
                 onRetry: viewModel.retry,
-                onNotificationTap: viewModel.handleNotificationTap,
+                onNotificationTap: (notification) {
+                  final action = viewModel.handleNotificationTap(notification);
+                  if (action != null) {
+                    context.pushNamed(action.routeName);
+                  }
+                },
               ),
             ),
           ],

@@ -246,6 +246,78 @@ void main() {
     expect(find.text('지원 상태가 변경되었습니다.'), findsOneWidget);
   });
 
+  testWidgets('삭제된 대상 알림은 읽음 처리 후 삭제 상태 화면으로 이동한다', (tester) async {
+    const initialState = NotificationViewState(
+      notifications: [
+        NotificationItem(
+          id: 'unread-deleted-target',
+          title: '프로그램 신청이 완료되었습니다.',
+          description: '프론트엔드 특강 신청이 완료되었습니다.',
+          time: '방금',
+          isRead: false,
+          targetState: NotificationTargetState.deleted,
+        ),
+      ],
+    );
+    final container = ProviderContainer(
+      overrides: [
+        notificationViewModelProvider.overrideWith(
+          () => _SeededNotificationViewModel(initialState),
+        ),
+      ],
+    );
+    addTearDown(container.dispose);
+
+    final router = _notificationRouter();
+    addTearDown(router.dispose);
+
+    await _pumpRouter(tester, router, container: container);
+    expect(container.read(notificationViewModelProvider).unreadCount, 1);
+
+    await tester.tap(find.text('프로그램 신청이 완료되었습니다.'));
+    await tester.pumpAndSettle();
+
+    expect(container.read(notificationViewModelProvider).unreadCount, 0);
+    expect(router.state.uri.path, '/notifications/deleted');
+    expect(find.text('삭제된 항목이에요.'), findsOneWidget);
+  });
+
+  testWidgets('접근할 수 없는 대상 알림은 읽음 처리 후 권한 없음 화면으로 이동한다', (tester) async {
+    const initialState = NotificationViewState(
+      notifications: [
+        NotificationItem(
+          id: 'unread-forbidden-target',
+          title: '포트폴리오 제출 요청',
+          description: '2026 상반기 포트폴리오 제출 요청이 도착했습니다.',
+          time: '방금',
+          isRead: false,
+          targetState: NotificationTargetState.forbidden,
+        ),
+      ],
+    );
+    final container = ProviderContainer(
+      overrides: [
+        notificationViewModelProvider.overrideWith(
+          () => _SeededNotificationViewModel(initialState),
+        ),
+      ],
+    );
+    addTearDown(container.dispose);
+
+    final router = _notificationRouter();
+    addTearDown(router.dispose);
+
+    await _pumpRouter(tester, router, container: container);
+    expect(container.read(notificationViewModelProvider).unreadCount, 1);
+
+    await tester.tap(find.text('포트폴리오 제출 요청'));
+    await tester.pumpAndSettle();
+
+    expect(container.read(notificationViewModelProvider).unreadCount, 0);
+    expect(router.state.uri.path, '/notifications/forbidden');
+    expect(find.text('접근할 수 없는 항목이에요.'), findsOneWidget);
+  });
+
   testWidgets('대상 삭제 Route에서 알림 목록으로 돌아간다', (tester) async {
     final router = GoRouter(
       initialLocation: '/notifications/deleted',
@@ -273,6 +345,31 @@ void main() {
 
     expect(find.text('지원 상태가 변경되었습니다.'), findsOneWidget);
   });
+}
+
+GoRouter _notificationRouter() {
+  return GoRouter(
+    initialLocation: '/notifications',
+    routes: [
+      GoRoute(
+        path: '/notifications',
+        builder: (context, state) => const NotificationView(),
+        routes: [
+          GoRoute(
+            path: 'deleted',
+            name: 'notification-target-deleted',
+            builder: (context, state) => const NotificationTargetDeletedView(),
+          ),
+          GoRoute(
+            path: 'forbidden',
+            name: 'notification-target-forbidden',
+            builder: (context, state) =>
+                const NotificationTargetForbiddenView(),
+          ),
+        ],
+      ),
+    ],
+  );
 }
 
 Future<void> _pumpNotificationView(WidgetTester tester) async {
