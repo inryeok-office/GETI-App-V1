@@ -2,6 +2,8 @@ import 'dart:async';
 
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
+import 'suitability_level.dart';
+
 part 'recommendation_view_model.g.dart';
 
 enum RecommendationStatus {
@@ -34,7 +36,7 @@ class RecommendationJob {
     required this.summary,
     required this.tags,
     required this.availability,
-    this.fitLabel,
+    this.suitabilityLevel,
     this.matchReason,
   });
 
@@ -43,7 +45,7 @@ class RecommendationJob {
   final String summary;
   final List<String> tags;
   final RecommendationJobAvailability availability;
-  final String? fitLabel;
+  final SuitabilityLevel? suitabilityLevel;
   final String? matchReason;
 }
 
@@ -234,7 +236,7 @@ const _mockJobs = [
     summary: '분당 · 정규직 · D-18',
     tags: ['React', 'TypeScript'],
     availability: RecommendationJobAvailability.active,
-    fitLabel: '매우 적합',
+    suitabilityLevel: SuitabilityLevel.highlyRecommended,
     matchReason: 'React, TypeScript 기술 스택과 일치합니다.',
   ),
   RecommendationJob(
@@ -243,7 +245,7 @@ const _mockJobs = [
     summary: '분당 · 정규직 · D-18',
     tags: ['React', 'TypeScript'],
     availability: RecommendationJobAvailability.active,
-    fitLabel: '적합',
+    suitabilityLevel: SuitabilityLevel.recommended,
     matchReason: 'React, TypeScript 기술 스택과 일치합니다.',
   ),
   RecommendationJob(
@@ -252,7 +254,7 @@ const _mockJobs = [
     summary: '분당 · 정규직 · D-18',
     tags: ['React', 'TypeScript'],
     availability: RecommendationJobAvailability.active,
-    fitLabel: '부적합',
+    suitabilityLevel: SuitabilityLevel.unsuitable,
     matchReason: 'React, TypeScript 기술 스택과 일치합니다.',
   ),
   RecommendationJob(
@@ -261,7 +263,7 @@ const _mockJobs = [
     summary: '분당 · 정규직 · D-18',
     tags: ['React', 'TypeScript'],
     availability: RecommendationJobAvailability.active,
-    fitLabel: '적합',
+    suitabilityLevel: SuitabilityLevel.recommended,
     matchReason: 'React, TypeScript 기술 스택과 일치합니다.',
   ),
   RecommendationJob(

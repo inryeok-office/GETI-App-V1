@@ -8,6 +8,15 @@ enum NotificationFilter { all, unread }
 
 enum NotificationTargetState { deleted, forbidden }
 
+enum NotificationTapAction {
+  targetDeleted('notification-target-deleted'),
+  targetForbidden('notification-target-forbidden');
+
+  const NotificationTapAction(this.routeName);
+
+  final String routeName;
+}
+
 class NotificationItem {
   const NotificationItem({
     required this.id,
@@ -92,6 +101,17 @@ class NotificationViewModel extends _$NotificationViewModel {
               : notification,
       ],
     );
+  }
+
+  NotificationTapAction? handleNotificationTap(NotificationItem notification) {
+    markAsRead(notification.id);
+
+    return switch (notification.targetState) {
+      NotificationTargetState.deleted => NotificationTapAction.targetDeleted,
+      NotificationTargetState.forbidden =>
+        NotificationTapAction.targetForbidden,
+      null => null,
+    };
   }
 
   void markAllAsRead() {

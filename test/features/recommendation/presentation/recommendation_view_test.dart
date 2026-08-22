@@ -4,9 +4,27 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:geti_app/features/recommendation/presentation/view/recommendation_view.dart';
 import 'package:geti_app/features/recommendation/presentation/view_model/recommendation_view_model.dart';
+import 'package:geti_app/features/recommendation/presentation/view_model/suitability_level.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+
+  test('추천 적합도는 SUITABILITY_LEVEL 5단계만 지원한다', () {
+    expect(SuitabilityLevel.values, [
+      SuitabilityLevel.veryUnsuitable,
+      SuitabilityLevel.unsuitable,
+      SuitabilityLevel.normal,
+      SuitabilityLevel.recommended,
+      SuitabilityLevel.highlyRecommended,
+    ]);
+    expect(SuitabilityLevel.values.map((level) => level.figmaLabel).toList(), [
+      null,
+      '부적합',
+      null,
+      '적합',
+      '매우 적합',
+    ]);
+  });
 
   test('추천 생성 액션은 생성 중 상태로 전환한다', () {
     final container = ProviderContainer();
@@ -100,6 +118,50 @@ void main() {
     );
     expect(find.text('삭제 또는 비공개 처리되어 더이상 접근할 수 없습니다.'), findsOneWidget);
     expect(find.text('공고 보기'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('Figma 근거가 있는 추천 적합도 문구만 표시한다', (tester) async {
+    const jobs = [
+      RecommendationJob(
+        companyName: '회사 A',
+        positionName: '매우 추천 공고',
+        summary: '서울 · 정규직 · D-10',
+        tags: [],
+        availability: RecommendationJobAvailability.active,
+        suitabilityLevel: SuitabilityLevel.highlyRecommended,
+      ),
+      RecommendationJob(
+        companyName: '회사 B',
+        positionName: '추천 공고',
+        summary: '서울 · 정규직 · D-10',
+        tags: [],
+        availability: RecommendationJobAvailability.active,
+        suitabilityLevel: SuitabilityLevel.recommended,
+      ),
+      RecommendationJob(
+        companyName: '회사 C',
+        positionName: '비추천 공고',
+        summary: '서울 · 정규직 · D-10',
+        tags: [],
+        availability: RecommendationJobAvailability.active,
+        suitabilityLevel: SuitabilityLevel.unsuitable,
+      ),
+    ];
+
+    await _pumpBody(
+      tester,
+      const RecommendationViewState(
+        status: RecommendationStatus.loaded,
+        jobs: jobs,
+      ),
+    );
+
+    expect(find.text('매우 적합'), findsOneWidget);
+    expect(find.text('적합'), findsOneWidget);
+    expect(find.text('부적합'), findsOneWidget);
+    expect(find.text('매우 부적합'), findsNothing);
+    expect(find.text('보통'), findsNothing);
     expect(tester.takeException(), isNull);
   });
 }

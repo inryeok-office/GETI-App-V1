@@ -31,7 +31,10 @@ class NotificationView extends ConsumerWidget {
                 onMarkAllAsRead: viewModel.markAllAsRead,
                 onRetry: viewModel.retry,
                 onNotificationTap: (notification) {
-                  _handleNotificationTap(context, viewModel, notification);
+                  final action = viewModel.handleNotificationTap(notification);
+                  if (action != null) {
+                    context.pushNamed(action.routeName);
+                  }
                 },
               ),
             ),
@@ -46,23 +49,6 @@ class NotificationView extends ConsumerWidget {
         ),
       ),
     );
-  }
-
-  void _handleNotificationTap(
-    BuildContext context,
-    NotificationViewModel viewModel,
-    NotificationItem notification,
-  ) {
-    viewModel.markAsRead(notification.id);
-
-    switch (notification.targetState) {
-      case NotificationTargetState.deleted:
-        context.push('/notifications/deleted');
-      case NotificationTargetState.forbidden:
-        context.push('/notifications/forbidden');
-      case null:
-        break;
-    }
   }
 }
 
