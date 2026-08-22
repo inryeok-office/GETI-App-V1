@@ -50,6 +50,7 @@ class ApplicationDetailView extends ConsumerWidget {
       body: ApplicationDetailBody(
         state: state,
         onRetry: viewModel.retry,
+        onBrowseJobs: () => context.go('/jobs'),
         onWithdraw: () => _confirmWithdraw(context, viewModel),
         onResubmit: viewModel.resubmitApplication,
       ),
@@ -107,6 +108,7 @@ class ApplicationDetailBody extends StatelessWidget {
   const ApplicationDetailBody({
     required this.state,
     required this.onRetry,
+    required this.onBrowseJobs,
     required this.onWithdraw,
     required this.onResubmit,
     super.key,
@@ -114,6 +116,7 @@ class ApplicationDetailBody extends StatelessWidget {
 
   final ApplicationDetailViewState state;
   final VoidCallback onRetry;
+  final VoidCallback onBrowseJobs;
   final VoidCallback onWithdraw;
   final VoidCallback onResubmit;
 
@@ -123,6 +126,7 @@ class ApplicationDetailBody extends StatelessWidget {
       return ApplicationDetailStateContent(
         status: state.screenStatus,
         onRetry: onRetry,
+        onBrowseJobs: onBrowseJobs,
       );
     }
 

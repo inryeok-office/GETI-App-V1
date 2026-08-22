@@ -298,6 +298,45 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('내 지원 목록'), findsOneWidget);
   });
+
+  testWidgets('missing application CTA navigates to the jobs route', (
+    tester,
+  ) async {
+    await _setViewport(tester);
+    final router = GoRouter(
+      initialLocation: '/applications/missing',
+      routes: [
+        GoRoute(
+          path: '/applications/:applicationId',
+          builder: (context, state) => ApplicationDetailView(
+            applicationId: state.pathParameters['applicationId']!,
+          ),
+        ),
+        GoRoute(
+          path: '/jobs',
+          builder: (context, state) =>
+              const Scaffold(body: SizedBox(key: ValueKey('jobs-route'))),
+        ),
+      ],
+    );
+    addTearDown(router.dispose);
+
+    await tester.pumpWidget(
+      ProviderScope(
+        child: ScreenUtilInit(
+          designSize: const Size(390, 844),
+          builder: (context, _) => MaterialApp.router(routerConfig: router),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byType(FilledButton));
+    await tester.pumpAndSettle();
+
+    expect(router.state.uri.path, '/jobs');
+    expect(find.byKey(const ValueKey('jobs-route')), findsOneWidget);
+  });
 }
 
 Future<void> _pumpState(
