@@ -33,7 +33,13 @@ void main() {
   });
 
   test('withdrawApplication updates the list mock status too', () {
-    final container = ProviderContainer();
+    final container = ProviderContainer(
+      overrides: [
+        applicationViewModelProvider.overrideWith(
+          _DetailApplicationListViewModel.new,
+        ),
+      ],
+    );
     final detailSubscription = container.listen(
       applicationDetailViewModelProvider('submitted'),
       (_, _) {},
@@ -60,7 +66,13 @@ void main() {
   });
 
   test('resubmitApplication updates the list mock status too', () {
-    final container = ProviderContainer();
+    final container = ProviderContainer(
+      overrides: [
+        applicationViewModelProvider.overrideWith(
+          _DetailApplicationListViewModel.new,
+        ),
+      ],
+    );
     final detailSubscription = container.listen(
       applicationDetailViewModelProvider('revision'),
       (_, _) {},
@@ -282,6 +294,11 @@ void main() {
     addTearDown(router.dispose);
     await tester.pumpWidget(
       ProviderScope(
+        overrides: [
+          applicationViewModelProvider.overrideWith(
+            _DetailApplicationListViewModel.new,
+          ),
+        ],
         child: ScreenUtilInit(
           designSize: const Size(390, 844),
           builder: (context, _) => MaterialApp.router(routerConfig: router),
@@ -337,6 +354,29 @@ void main() {
     expect(router.state.uri.path, '/jobs');
     expect(find.byKey(const ValueKey('jobs-route')), findsOneWidget);
   });
+}
+
+class _DetailApplicationListViewModel extends ApplicationViewModel {
+  @override
+  ApplicationViewState build() => const ApplicationViewState(
+    screenStatus: ApplicationScreenStatus.loaded,
+    applications: [
+      ApplicationItem(
+        id: 'submitted',
+        companyName: '당근',
+        positionName: '웹 프론트엔드 인턴',
+        status: ApplicationProgressStatus.submitted,
+        submittedDate: '2026.08.01',
+      ),
+      ApplicationItem(
+        id: 'revision',
+        companyName: '당근',
+        positionName: '웹 프론트엔드 인턴',
+        status: ApplicationProgressStatus.revisionRequested,
+        submittedDate: '2026.08.01',
+      ),
+    ],
+  );
 }
 
 Future<void> _pumpState(
