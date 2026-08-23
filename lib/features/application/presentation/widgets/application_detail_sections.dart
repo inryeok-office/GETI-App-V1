@@ -92,14 +92,19 @@ class ApplicationDetailNotice extends StatelessWidget {
 }
 
 class SubmittedAnswerSection extends StatelessWidget {
-  const SubmittedAnswerSection({required this.answer, super.key});
+  const SubmittedAnswerSection({
+    required this.title,
+    required this.answer,
+    super.key,
+  });
 
+  final String title;
   final String answer;
 
   @override
   Widget build(BuildContext context) {
     return _DetailSection(
-      title: '지원 동기',
+      title: title,
       child: Text(
         answer,
         style: AppTypography.body.copyWith(color: AppColors.neutral600),

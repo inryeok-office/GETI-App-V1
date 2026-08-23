@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:geti_app/features/application/data/repository/application_repository_impl.dart';
+import 'package:geti_app/features/application/domain/model/job_application_detail.dart';
 import 'package:geti_app/features/application/domain/model/application_summary.dart';
 import 'package:geti_app/features/application/domain/repository/application_repository.dart';
 import 'package:geti_app/features/application/presentation/view_model/application_view_model.dart';
@@ -114,6 +115,10 @@ class _FakeApplicationRepository implements ApplicationRepository {
 
   final List<ApplicationSummary> applications;
   Object? error;
+
+  @override
+  Future<JobApplicationDetail?> getApplicationDetail(int applicationId) async =>
+      null;
 
   @override
   Future<List<ApplicationSummary>> getMyApplications() async {

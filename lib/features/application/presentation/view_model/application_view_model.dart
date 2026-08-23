@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:geti_app/features/application/data/repository/application_repository_impl.dart';
 import 'package:geti_app/features/application/domain/model/application_summary.dart';
+import 'package:geti_app/features/application/presentation/view_model/application_date_formatter.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 part 'application_view_model.g.dart';
@@ -168,7 +169,7 @@ class ApplicationViewModel extends _$ApplicationViewModel {
       companyName: job?.companyName ?? '',
       positionName: job?.title ?? '삭제된 공고',
       status: _toProgressStatus(application.status),
-      submittedDate: _formatDate(application.submittedAt),
+      submittedDate: formatApplicationDate(application.submittedAt),
       isDeleted: job == null || job.isDeleted,
     );
   }
@@ -186,13 +187,5 @@ class ApplicationViewModel extends _$ApplicationViewModel {
       ApplicationStatus.forwarded => ApplicationProgressStatus.reviewing,
       ApplicationStatus.withdrawn => ApplicationProgressStatus.cancelled,
     };
-  }
-
-  String _formatDate(DateTime? value) {
-    if (value == null) return '-';
-    final local = value.toLocal();
-    return '${local.year.toString().padLeft(4, '0')}.'
-        '${local.month.toString().padLeft(2, '0')}.'
-        '${local.day.toString().padLeft(2, '0')}';
   }
 }

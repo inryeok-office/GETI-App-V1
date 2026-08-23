@@ -42,7 +42,7 @@ final class ApplicationViewModelProvider
 }
 
 String _$applicationViewModelHash() =>
-    r'a734ecde062f0cbcb33a53099c54dae778c2d13c';
+    r'087f6a3328b020137c9e95150e71c029956680f8';
 
 abstract class _$ApplicationViewModel extends $Notifier<ApplicationViewState> {
   ApplicationViewState build();

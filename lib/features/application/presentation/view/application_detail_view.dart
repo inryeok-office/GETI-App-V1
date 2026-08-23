@@ -146,15 +146,24 @@ class ApplicationDetailBody extends StatelessWidget {
                       SizedBox(height: 12.h),
                       ApplicationDetailNotice(detail: detail),
                     ],
-                    SizedBox(height: 12.h),
-                    SubmittedAnswerSection(answer: detail.answer),
-                    SizedBox(height: 12.h),
-                    ApplicationAttachmentSection(
-                      fileName: detail.fileName,
-                      fileDescription: detail.fileDescription,
-                    ),
-                    SizedBox(height: 12.h),
-                    ApplicationStatusHistorySection(history: detail.history),
+                    for (final answer in detail.answers) ...[
+                      SizedBox(height: 12.h),
+                      SubmittedAnswerSection(
+                        title: answer.title,
+                        answer: answer.value,
+                      ),
+                    ],
+                    for (final file in detail.files) ...[
+                      SizedBox(height: 12.h),
+                      ApplicationAttachmentSection(
+                        fileName: file.name,
+                        fileDescription: file.description,
+                      ),
+                    ],
+                    if (detail.history.isNotEmpty) ...[
+                      SizedBox(height: 12.h),
+                      ApplicationStatusHistorySection(history: detail.history),
+                    ],
                   ],
                 ),
               ),
