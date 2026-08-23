@@ -1,3 +1,7 @@
+import 'dart:async';
+
+import 'package:geti_app/features/application/data/repository/application_repository_impl.dart';
+import 'package:geti_app/features/application/domain/model/application_summary.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 part 'application_view_model.g.dart';
@@ -50,9 +54,9 @@ class ApplicationItem {
 
 class ApplicationViewState {
   const ApplicationViewState({
-    this.screenStatus = ApplicationScreenStatus.loaded,
+    this.screenStatus = ApplicationScreenStatus.loading,
     this.selectedFilter = ApplicationFilter.all,
-    this.applications = mockApplications,
+    this.applications = const [],
   });
 
   final ApplicationScreenStatus screenStatus;
@@ -104,17 +108,42 @@ extension ApplicationProgressStatusFilter on ApplicationProgressStatus {
 @riverpod
 class ApplicationViewModel extends _$ApplicationViewModel {
   @override
-  ApplicationViewState build() => const ApplicationViewState();
+  ApplicationViewState build() {
+    unawaited(Future<void>.microtask(_loadApplications));
+    return const ApplicationViewState();
+  }
 
   void selectFilter(ApplicationFilter filter) {
     state = state.copyWith(selectedFilter: filter);
   }
 
-  Future<void> retry() async {
-    state = state.copyWith(screenStatus: ApplicationScreenStatus.loading);
-    await Future<void>.delayed(const Duration(milliseconds: 700));
-    if (!ref.mounted) return;
-    state = state.copyWith(screenStatus: ApplicationScreenStatus.loaded);
+  Future<void> retry() {
+    return _loadApplications();
+  }
+
+  Future<void> _loadApplications() async {
+    state = state.copyWith(
+      screenStatus: ApplicationScreenStatus.loading,
+      applications: const [],
+    );
+    try {
+      final repository = ref.read(applicationRepositoryProvider);
+      final applications = await repository.getMyApplications();
+      if (!ref.mounted) return;
+      final items = applications.map(_toPresentation).toList(growable: false);
+      state = state.copyWith(
+        screenStatus: items.isEmpty
+            ? ApplicationScreenStatus.empty
+            : ApplicationScreenStatus.loaded,
+        applications: items,
+      );
+    } on Object {
+      if (!ref.mounted) return;
+      state = state.copyWith(
+        screenStatus: ApplicationScreenStatus.networkError,
+        applications: const [],
+      );
+    }
   }
 
   void updateApplicationStatus(
@@ -131,65 +160,39 @@ class ApplicationViewModel extends _$ApplicationViewModel {
           .toList(growable: false),
     );
   }
-}
 
-const mockApplications = [
-  ApplicationItem(
-    id: 'submitted',
-    companyName: '당근',
-    positionName: '웹 프론트엔드 인턴',
-    status: ApplicationProgressStatus.submitted,
-    submittedDate: '2026.08.01',
-  ),
-  ApplicationItem(
-    id: 'reviewing',
-    companyName: '토스페이먼츠',
-    positionName: 'Frontend Developer',
-    status: ApplicationProgressStatus.reviewing,
-    submittedDate: '2026.08.01',
-  ),
-  ApplicationItem(
-    id: 'deleted',
-    companyName: '네이버클라우드',
-    positionName: '삭제된 공고',
-    status: ApplicationProgressStatus.cancelled,
-    submittedDate: '2026.07.20',
-    isDeleted: true,
-  ),
-  ApplicationItem(
-    id: 'revision',
-    companyName: '당근',
-    positionName: '웹 프론트엔드 인턴',
-    status: ApplicationProgressStatus.revisionRequested,
-    submittedDate: '2026.08.01',
-  ),
-  ApplicationItem(
-    id: 'interviewing',
-    companyName: '당근',
-    positionName: '웹 프론트엔드 인턴',
-    status: ApplicationProgressStatus.interviewing,
-    submittedDate: '2026.08.01',
-  ),
-  ApplicationItem(
-    id: 'accepted',
-    companyName: '당근',
-    positionName: '웹 프론트엔드 인턴',
-    status: ApplicationProgressStatus.accepted,
-    submittedDate: '2026.08.01',
-  ),
-  ApplicationItem(
-    id: 'rejected',
-    companyName: '당근',
-    positionName: '웹 프론트엔드 인턴',
-    status: ApplicationProgressStatus.rejected,
-    submittedDate: '2026.08.01',
-  ),
-  ApplicationItem(
-    id: 'ended',
-    companyName: '네이버클라우드',
-    positionName: '삭제된 공고',
-    status: ApplicationProgressStatus.ended,
-    submittedDate: '2026.07.20',
-    isDeleted: true,
-  ),
-];
+  ApplicationItem _toPresentation(ApplicationSummary application) {
+    final job = application.job;
+    return ApplicationItem(
+      id: application.applicationId.toString(),
+      companyName: job?.companyName ?? '',
+      positionName: job?.title ?? '삭제된 공고',
+      status: _toProgressStatus(application.status),
+      submittedDate: _formatDate(application.submittedAt),
+      isDeleted: job == null || job.isDeleted,
+    );
+  }
+
+  ApplicationProgressStatus _toProgressStatus(ApplicationStatus status) {
+    return switch (status) {
+      ApplicationStatus.draft => throw StateError('DRAFT는 앱 목록에 표시할 수 없습니다.'),
+      ApplicationStatus.submitted => ApplicationProgressStatus.submitted,
+      ApplicationStatus.editRequested ||
+      ApplicationStatus.editAllowed ||
+      ApplicationStatus.revisionRequested =>
+        ApplicationProgressStatus.revisionRequested,
+      ApplicationStatus.approved => ApplicationProgressStatus.accepted,
+      ApplicationStatus.rejected => ApplicationProgressStatus.rejected,
+      ApplicationStatus.forwarded => ApplicationProgressStatus.reviewing,
+      ApplicationStatus.withdrawn => ApplicationProgressStatus.cancelled,
+    };
+  }
+
+  String _formatDate(DateTime? value) {
+    if (value == null) return '-';
+    final local = value.toLocal();
+    return '${local.year.toString().padLeft(4, '0')}.'
+        '${local.month.toString().padLeft(2, '0')}.'
+        '${local.day.toString().padLeft(2, '0')}';
+  }
+}

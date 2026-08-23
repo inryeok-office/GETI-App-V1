@@ -11,7 +11,7 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   testWidgets('진행 중 필터는 진행 중인 지원만 표시한다', (tester) async {
-    final container = ProviderContainer();
+    final container = _loadedContainer();
     addTearDown(container.dispose);
     await _pumpApplicationView(tester, container);
 
@@ -28,7 +28,7 @@ void main() {
   });
 
   testWidgets('종료 필터는 종료된 지원만 표시한다', (tester) async {
-    final container = ProviderContainer();
+    final container = _loadedContainer();
     addTearDown(container.dispose);
     await _pumpApplicationView(tester, container);
 
@@ -47,6 +47,7 @@ void main() {
       tester,
       ApplicationScreenBody(
         state: const ApplicationViewState(
+          screenStatus: ApplicationScreenStatus.loaded,
           selectedFilter: ApplicationFilter.closed,
           applications: [
             ApplicationItem(
@@ -67,7 +68,7 @@ void main() {
   });
 
   testWidgets('기본 내 지원 목록과 마이 탭을 표시한다', (tester) async {
-    final container = ProviderContainer();
+    final container = _loadedContainer();
     addTearDown(container.dispose);
     await _pumpApplicationView(tester, container);
 
@@ -85,7 +86,7 @@ void main() {
   });
 
   testWidgets('필터 선택 상태를 ViewModel에 반영한다', (tester) async {
-    final container = ProviderContainer();
+    final container = _loadedContainer();
     addTearDown(container.dispose);
     await _pumpApplicationView(tester, container);
 
@@ -238,6 +239,85 @@ class _EmptyApplicationViewModel extends ApplicationViewModel {
     applications: [],
   );
 }
+
+class _LoadedApplicationViewModel extends ApplicationViewModel {
+  @override
+  ApplicationViewState build() => const ApplicationViewState(
+    screenStatus: ApplicationScreenStatus.loaded,
+    applications: _testApplications,
+  );
+}
+
+ProviderContainer _loadedContainer() {
+  return ProviderContainer(
+    overrides: [
+      applicationViewModelProvider.overrideWith(
+        _LoadedApplicationViewModel.new,
+      ),
+    ],
+  );
+}
+
+const _testApplications = [
+  ApplicationItem(
+    id: 'submitted',
+    companyName: '당근',
+    positionName: '웹 프론트엔드 인턴',
+    status: ApplicationProgressStatus.submitted,
+    submittedDate: '2026.08.01',
+  ),
+  ApplicationItem(
+    id: 'reviewing',
+    companyName: '토스페이먼츠',
+    positionName: 'Frontend Developer',
+    status: ApplicationProgressStatus.reviewing,
+    submittedDate: '2026.08.01',
+  ),
+  ApplicationItem(
+    id: 'deleted',
+    companyName: '네이버클라우드',
+    positionName: '삭제된 공고',
+    status: ApplicationProgressStatus.cancelled,
+    submittedDate: '2026.07.20',
+    isDeleted: true,
+  ),
+  ApplicationItem(
+    id: 'revision',
+    companyName: '당근',
+    positionName: '웹 프론트엔드 인턴',
+    status: ApplicationProgressStatus.revisionRequested,
+    submittedDate: '2026.08.01',
+  ),
+  ApplicationItem(
+    id: 'interviewing',
+    companyName: '당근',
+    positionName: '웹 프론트엔드 인턴',
+    status: ApplicationProgressStatus.interviewing,
+    submittedDate: '2026.08.01',
+  ),
+  ApplicationItem(
+    id: 'accepted',
+    companyName: '당근',
+    positionName: '웹 프론트엔드 인턴',
+    status: ApplicationProgressStatus.accepted,
+    submittedDate: '2026.08.01',
+  ),
+  ApplicationItem(
+    id: 'rejected',
+    companyName: '당근',
+    positionName: '웹 프론트엔드 인턴',
+    status: ApplicationProgressStatus.rejected,
+    submittedDate: '2026.08.01',
+  ),
+  ApplicationItem(
+    id: 'ended',
+    companyName: '네이버클라우드',
+    positionName: '삭제된 공고',
+    status: ApplicationProgressStatus.ended,
+    submittedDate: '2026.07.20',
+    isDeleted: true,
+  ),
+];
 
 Future<void> _pumpApplicationView(
   WidgetTester tester,
