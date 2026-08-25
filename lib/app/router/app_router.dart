@@ -1,6 +1,7 @@
 import 'package:geti_app/features/application/presentation/view/application_view.dart';
 import 'package:geti_app/features/application/presentation/view/application_detail_view.dart';
 import 'package:geti_app/features/auth/presentation/view/login_view.dart';
+import 'package:geti_app/features/auth/presentation/view/oauth_webview_page.dart';
 import 'package:geti_app/features/auth/presentation/view/profile_completion_guide_view.dart';
 import 'package:geti_app/features/auth/presentation/view/relogin_prompt_view.dart';
 import 'package:geti_app/features/company/presentation/view/company_detail_view.dart';
@@ -37,6 +38,12 @@ GoRouter appRouter(Ref ref) {
             path: 'profile-guide',
             name: 'login-profile-guide',
             builder: (context, state) => const ProfileCompletionGuideView(),
+          ),
+          GoRoute(
+            path: 'oauth',
+            name: 'login-oauth',
+            builder: (context, state) =>
+                OAuthWebViewPage(authorizationUrl: state.extra! as String),
           ),
         ],
       ),
