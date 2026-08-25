@@ -4,8 +4,99 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:geti_app/features/company/presentation/view/company_detail_view.dart';
 import 'package:geti_app/features/company/presentation/view/company_view.dart';
+import 'package:geti_app/features/job/data/dto/ai_reanalysis_response.dart';
+import 'package:geti_app/features/job/data/dto/job_detail_response.dart';
+import 'package:geti_app/features/job/data/dto/job_search_response.dart';
+import 'package:geti_app/features/job/data/dto/job_source_response.dart';
+import 'package:geti_app/features/job/data/dto/recommendation_job_response.dart';
+import 'package:geti_app/features/job/data/job_repository.dart';
 import 'package:geti_app/features/job/presentation/view/job_detail_view.dart';
 import 'package:go_router/go_router.dart';
+
+const _companyEligible = JobEligibilitySnapshotDto(
+  canApply: true,
+  eligibilityReason: 'AVAILABLE',
+  eligibilityMessage: '지원 가능한 공고입니다.',
+);
+
+class _FakeJobRepository implements JobRepository {
+  final List<JobSummaryResponse> jobs = [
+    JobSummaryResponse(
+      jobId: 1,
+      title: '2026 AI 서비스 개발 인턴십 참가자 모집',
+      postingType: 'GENERAL',
+      applicationMethod: 'EXTERNAL',
+      status: 'PUBLISHED',
+      company: const CompanySummaryDto(companyId: 1, name: '네이버클라우드'),
+      application: _companyEligible,
+    ),
+    JobSummaryResponse(
+      jobId: 2,
+      title: '웹 프론트엔드 주니어 개발자 채용',
+      postingType: 'GENERAL',
+      applicationMethod: 'EXTERNAL',
+      status: 'CLOSED',
+      company: const CompanySummaryDto(companyId: 2, name: '우아한형제들'),
+      application: _companyEligible,
+    ),
+  ];
+
+  @override
+  Future<JobSearchResponse> searchJobs({
+    String? query,
+    String? postingType,
+    String? applicationMethod,
+    String? sourceName,
+    String? sort,
+    String? direction,
+    int page = 0,
+    int size = 20,
+  }) async => JobSearchResponse(
+    content: jobs,
+    page: 0,
+    size: size,
+    totalElements: jobs.length,
+    totalPages: 1,
+    first: true,
+    last: true,
+  );
+
+  @override
+  Future<JobDetailResponse> getJobDetail(int jobId) {
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<List<PublicJobSourceResponse>> getJobSources({
+    bool activeOnly = false,
+  }) async => [];
+
+  @override
+  Future<void> addBookmark(int jobId) {
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<void> removeBookmark(int jobId) {
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<RecommendationJobListResponse> getJobBookmarks({
+    String? query,
+    String? postingType,
+    String? sort,
+    int page = 0,
+    int size = 20,
+  }) {
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<AiReanalysisResponse> requestAiReanalysis(int jobId) {
+    throw UnimplementedError();
+  }
+}
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -200,6 +291,9 @@ Future<void> _pumpRoute(WidgetTester tester, String initialLocation) async {
   addTearDown(router.dispose);
   await tester.pumpWidget(
     ProviderScope(
+      overrides: [
+        jobRepositoryProvider.overrideWithValue(_FakeJobRepository()),
+      ],
       child: ScreenUtilInit(
         designSize: const Size(390, 844),
         builder: (context, _) => MaterialApp.router(routerConfig: router),

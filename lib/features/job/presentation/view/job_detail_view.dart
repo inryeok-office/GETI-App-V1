@@ -19,6 +19,26 @@ class JobDetailView extends ConsumerWidget {
     final job = state.job;
     final detail = state.detail;
 
+    final Widget body = switch (state.screenStatus) {
+      JobDetailScreenStatus.loading => const _JobDetailLoading(),
+      JobDetailScreenStatus.notFound => const _JobNotFound(),
+      JobDetailScreenStatus.networkError => _JobDetailNetworkError(
+        onRetry: () =>
+            ref.read(jobDetailViewModelProvider(jobId).notifier).retry(),
+      ),
+      JobDetailScreenStatus.loaded when job == null || detail == null =>
+        const _JobNotFound(),
+      JobDetailScreenStatus.loaded => _JobDetailBody(
+        jobId: jobId,
+        job: job!,
+        detail: detail!,
+        viewCount: state.viewCount,
+        aiAnalysis:
+            state.aiAnalysis ??
+            const JobAiAnalysis(status: JobAiAnalysisStatus.pending),
+      ),
+    };
+
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
@@ -47,16 +67,60 @@ class JobDetailView extends ConsumerWidget {
           style: AppTypography.heading2.copyWith(color: AppColors.neutral900),
         ),
       ),
-      body: job == null || detail == null
-          ? const _JobNotFound()
-          : _JobDetailBody(
-              job: job,
-              detail: detail,
-              viewCount: state.viewCount,
-              aiAnalysis: state.aiAnalysis ?? detail.aiAnalysis,
-            ),
+      body: body,
     );
   }
+}
+
+class _JobDetailLoading extends StatelessWidget {
+  const _JobDetailLoading();
+  @override
+  Widget build(BuildContext context) => Center(
+    child: Text(
+      '공고를 불러오는 중...',
+      style: AppTypography.body.copyWith(color: AppColors.neutral500),
+    ),
+  );
+}
+
+class _JobDetailNetworkError extends StatelessWidget {
+  const _JobDetailNetworkError({required this.onRetry});
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) => Center(
+    child: InkWell(
+      key: const ValueKey('job-detail-retry'),
+      onTap: onRetry,
+      borderRadius: BorderRadius.circular(8.r),
+      child: Padding(
+        padding: EdgeInsets.all(16.w),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.wifi_off_rounded,
+              size: 48.w,
+              color: AppColors.neutral600,
+            ),
+            SizedBox(height: 24.h),
+            Text(
+              '공고를 불러오지 못했어요.',
+              style: AppTypography.bodyLarge.copyWith(
+                color: AppColors.neutral900,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            SizedBox(height: 8.h),
+            Text(
+              '연결 상태를 확인한 뒤 다시 시도해 주세요.',
+              style: AppTypography.body.copyWith(color: AppColors.neutral600),
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
 }
 
 class _JobNotFound extends StatelessWidget {
@@ -87,11 +151,13 @@ class _JobNotFound extends StatelessWidget {
 
 class _JobDetailBody extends ConsumerWidget {
   const _JobDetailBody({
+    required this.jobId,
     required this.job,
     required this.detail,
     required this.viewCount,
     required this.aiAnalysis,
   });
+  final String jobId;
   final JobItem job;
   final JobDetail detail;
   final int viewCount;
@@ -99,10 +165,7 @@ class _JobDetailBody extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final isBookmarked = ref.watch(
-      jobViewModelProvider.select((s) => s.bookmarkedJobIds.contains(job.id)),
-    );
-    final isSchool = job.source == JobSource.school;
+    final isSchool = job.applicationMethod == JobApplicationMethod.internal;
 
     return Column(
       children: [
@@ -118,41 +181,21 @@ class _JobDetailBody extends ConsumerWidget {
                     _JobSummaryCard(job: job, isSchool: isSchool),
                     SizedBox(height: 24.h),
                     _Section(title: '공고 소개', body: detail.description),
-                    _BulletSection(
-                      title: '주요 업무',
-                      items: detail.responsibilities,
-                    ),
-                    _BulletSection(
-                      title: '자격 요건',
-                      items: detail.qualifications,
-                    ),
-                    _BulletSection(
-                      title: '우대 사항',
-                      items: detail.preferredQualifications,
-                    ),
-                    _BulletSection(
-                      title: '근무 조건',
-                      items: detail.workConditions,
-                    ),
-                    _HiringProcessSection(steps: detail.hiringProcess),
                     SizedBox(height: 24.h),
                     _JobApplicationInfoCard(
                       job: job,
                       detail: detail,
                       viewCount: viewCount,
                     ),
-                    if (detail.attachmentName != null) ...[
+                    if (detail.attachments.isNotEmpty) ...[
                       SizedBox(height: 24.h),
-                      _JobAttachmentSection(
-                        name: detail.attachmentName!,
-                        description: detail.attachmentDescription ?? '',
-                      ),
+                      _JobAttachmentSection(attachments: detail.attachments),
                     ],
                     SizedBox(height: 16.h),
                     _AiAnalysisCard(
                       analysis: aiAnalysis,
                       onRetry: () => ref
-                          .read(jobDetailViewModelProvider(job.id).notifier)
+                          .read(jobDetailViewModelProvider(jobId).notifier)
                           .retryAiAnalysis(),
                     ),
                   ],
@@ -164,9 +207,10 @@ class _JobDetailBody extends ConsumerWidget {
         _JobDetailAction(
           job: job,
           detail: detail,
-          isBookmarked: isBookmarked,
-          onBookmarkTap: () =>
-              ref.read(jobViewModelProvider.notifier).toggleBookmark(job.id),
+          isBookmarked: job.bookmarked,
+          onBookmarkTap: () => ref
+              .read(jobDetailViewModelProvider(jobId).notifier)
+              .toggleBookmark(),
         ),
       ],
     );
@@ -275,93 +319,6 @@ class _Section extends StatelessWidget {
   );
 }
 
-class _BulletSection extends StatelessWidget {
-  const _BulletSection({required this.title, required this.items});
-  final String title;
-  final List<String> items;
-
-  @override
-  Widget build(BuildContext context) {
-    if (items.isEmpty) return const SizedBox.shrink();
-    return Padding(
-      padding: EdgeInsets.only(bottom: 24.h),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            title,
-            style: AppTypography.heading3.copyWith(color: AppColors.neutral900),
-          ),
-          SizedBox(height: 12.h),
-          ...items.map(
-            (item) => Padding(
-              padding: EdgeInsets.only(bottom: 4.h),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    '·  ',
-                    style: AppTypography.bodyLarge.copyWith(
-                      color: AppColors.neutral800,
-                    ),
-                  ),
-                  Expanded(
-                    child: Text(
-                      item,
-                      style: AppTypography.bodyLarge.copyWith(
-                        color: AppColors.neutral800,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _HiringProcessSection extends StatelessWidget {
-  const _HiringProcessSection({required this.steps});
-  final List<String> steps;
-
-  @override
-  Widget build(BuildContext context) => Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      Text(
-        '채용 절차',
-        style: AppTypography.heading3.copyWith(color: AppColors.neutral900),
-      ),
-      SizedBox(height: 12.h),
-      Wrap(
-        crossAxisAlignment: WrapCrossAlignment.center,
-        children: [
-          for (var i = 0; i < steps.length; i++) ...[
-            if (i > 0)
-              Padding(
-                padding: EdgeInsets.symmetric(horizontal: 8.w),
-                child: Icon(
-                  Icons.chevron_right,
-                  size: 16.w,
-                  color: AppColors.neutral500,
-                ),
-              ),
-            Text(
-              steps[i],
-              style: AppTypography.bodyLarge.copyWith(
-                color: AppColors.neutral800,
-              ),
-            ),
-          ],
-        ],
-      ),
-    ],
-  );
-}
-
 class _JobApplicationInfoCard extends StatelessWidget {
   const _JobApplicationInfoCard({
     required this.job,
@@ -453,9 +410,8 @@ class _JobApplicationInfoCard extends StatelessWidget {
 }
 
 class _JobAttachmentSection extends StatelessWidget {
-  const _JobAttachmentSection({required this.name, required this.description});
-  final String name;
-  final String description;
+  const _JobAttachmentSection({required this.attachments});
+  final List<JobAttachment> attachments;
 
   @override
   Widget build(BuildContext context) => Container(
@@ -474,15 +430,30 @@ class _JobAttachmentSection extends StatelessWidget {
           style: AppTypography.heading3.copyWith(color: AppColors.neutral900),
         ),
         SizedBox(height: 12.h),
-        Text(
-          name,
-          style: AppTypography.body.copyWith(color: AppColors.neutral900),
-        ),
-        SizedBox(height: 4.h),
-        Text(
-          description,
-          style: AppTypography.caption.copyWith(color: AppColors.neutral600),
-        ),
+        for (final attachment in attachments)
+          Padding(
+            padding: EdgeInsets.only(
+              bottom: attachment == attachments.last ? 0 : 12.h,
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  attachment.name,
+                  style: AppTypography.body.copyWith(
+                    color: AppColors.neutral900,
+                  ),
+                ),
+                SizedBox(height: 4.h),
+                Text(
+                  attachment.sizeLabel,
+                  style: AppTypography.caption.copyWith(
+                    color: AppColors.neutral600,
+                  ),
+                ),
+              ],
+            ),
+          ),
       ],
     ),
   );
@@ -860,7 +831,7 @@ class _JobDetailAction extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isSchool = job.source == JobSource.school;
+    final isSchool = job.applicationMethod == JobApplicationMethod.internal;
     final isClosed = job.isClosed;
     final isIneligible = !isClosed && !job.canApply;
     final isDisabled = isClosed || isIneligible;

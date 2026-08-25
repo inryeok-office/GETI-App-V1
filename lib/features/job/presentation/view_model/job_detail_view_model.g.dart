@@ -59,7 +59,7 @@ final class JobDetailViewModelProvider
 }
 
 String _$jobDetailViewModelHash() =>
-    r'3165570c9d5f40d223be5676a4e0cdcd7f45c129';
+    r'e148406a32b6ff4d7729b0e80bb2eaf98e0f6da6';
 
 final class JobDetailViewModelFamily extends $Family
     with

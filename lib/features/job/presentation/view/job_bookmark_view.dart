@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:geti_app/features/job/presentation/view_model/job_bookmark_view_model.dart';
 import 'package:geti_app/features/job/presentation/view_model/job_view_model.dart';
 import 'package:geti_app/features/job/presentation/widgets/job_card.dart';
 import 'package:geti_app/features/job/presentation/widgets/job_state_content.dart';
@@ -13,9 +14,9 @@ class JobBookmarkView extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final state = ref.watch(jobViewModelProvider);
-    final viewModel = ref.read(jobViewModelProvider.notifier);
-    final bookmarkedJobs = state.bookmarkedJobs;
+    final state = ref.watch(jobBookmarkViewModelProvider);
+    final viewModel = ref.read(jobBookmarkViewModelProvider.notifier);
+    final bookmarkedJobs = state.jobs;
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -58,36 +59,41 @@ class JobBookmarkView extends ConsumerWidget {
               ),
               SizedBox(height: 20.h),
               Expanded(
-                child: bookmarkedJobs.isEmpty
-                    ? JobBookmarkEmptyState(
-                        onBrowseJobs: () => context.go('/jobs'),
-                      )
-                    : ListView.separated(
-                        padding: EdgeInsets.only(bottom: 24.h),
-                        itemCount: bookmarkedJobs.length + 1,
-                        separatorBuilder: (_, _) => SizedBox(height: 12.h),
-                        itemBuilder: (context, index) {
-                          if (index == 0) {
-                            return Padding(
-                              padding: EdgeInsets.only(bottom: 4.h),
-                              child: Text(
-                                '저장한 공고 ${bookmarkedJobs.length}개',
-                                style: AppTypography.body.copyWith(
-                                  color: AppColors.neutral900,
-                                ),
-                              ),
-                            );
-                          }
-                          final job = bookmarkedJobs[index - 1];
-                          return JobCard(
-                            job: job,
-                            isBookmarked: true,
-                            onTap: () => context.push('/jobs/${job.id}'),
-                            onBookmarkTap: () =>
-                                viewModel.toggleBookmark(job.id),
-                          );
-                        },
-                      ),
+                child: switch (state.screenStatus) {
+                  JobScreenStatus.loading => const JobLoadingState(),
+                  JobScreenStatus.networkError => JobNetworkErrorState(
+                    onRetry: viewModel.retry,
+                  ),
+                  JobScreenStatus.loaded when bookmarkedJobs.isEmpty =>
+                    JobBookmarkEmptyState(
+                      onBrowseJobs: () => context.go('/jobs'),
+                    ),
+                  JobScreenStatus.loaded => ListView.separated(
+                    padding: EdgeInsets.only(bottom: 24.h),
+                    itemCount: bookmarkedJobs.length + 1,
+                    separatorBuilder: (_, _) => SizedBox(height: 12.h),
+                    itemBuilder: (context, index) {
+                      if (index == 0) {
+                        return Padding(
+                          padding: EdgeInsets.only(bottom: 4.h),
+                          child: Text(
+                            '저장한 공고 ${bookmarkedJobs.length}개',
+                            style: AppTypography.body.copyWith(
+                              color: AppColors.neutral900,
+                            ),
+                          ),
+                        );
+                      }
+                      final job = bookmarkedJobs[index - 1];
+                      return JobCard(
+                        job: job,
+                        isBookmarked: true,
+                        onTap: () => context.push('/jobs/${job.id}'),
+                        onBookmarkTap: () => viewModel.toggleBookmark(job.id),
+                      );
+                    },
+                  ),
+                },
               ),
             ],
           ),

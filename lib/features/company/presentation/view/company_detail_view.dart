@@ -127,11 +127,7 @@ class _CompanyDetailBody extends ConsumerWidget {
                     for (final job in jobs) ...[
                       JobCard(
                         job: job,
-                        isBookmarked: ref.watch(
-                          jobViewModelProvider.select(
-                            (s) => s.bookmarkedJobIds.contains(job.id),
-                          ),
-                        ),
+                        isBookmarked: job.bookmarked,
                         onTap: () => context.push('/jobs/${job.id}'),
                         onBookmarkTap: () => ref
                             .read(jobViewModelProvider.notifier)

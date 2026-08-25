@@ -9,6 +9,11 @@ import 'package:geti_app/features/auth/data/dto/oauth_login_response.dart';
 import 'package:geti_app/features/auth/data/dto/session_response.dart';
 import 'package:geti_app/features/auth/data/dto/token_refresh_response.dart';
 import 'package:geti_app/features/auth/presentation/view/login_view.dart';
+import 'package:geti_app/features/job/data/dto/ai_reanalysis_response.dart';
+import 'package:geti_app/features/job/data/dto/job_detail_response.dart';
+import 'package:geti_app/features/job/data/dto/job_search_response.dart';
+import 'package:geti_app/features/job/data/dto/job_source_response.dart';
+import 'package:geti_app/features/job/data/dto/recommendation_job_response.dart';
 import 'package:geti_app/features/auth/presentation/view/profile_completion_guide_view.dart';
 import 'package:geti_app/features/auth/presentation/view/relogin_prompt_view.dart';
 import 'package:geti_app/features/auth/presentation/view_model/auth_view_model.dart';
@@ -49,6 +54,60 @@ class _FakeRestClient implements RestClient {
 
   @override
   Future<HttpResponse<dynamic>> logout(String refreshToken) async {
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<ApiResponseJobSearchResponse> getJobs({
+    String? query,
+    String? postingType,
+    String? applicationMethod,
+    String? sourceName,
+    String? sort,
+    String? direction,
+    int page = 0,
+    int size = 20,
+  }) async {
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<ApiResponseJobDetailResponse> getJobDetail(int jobId) async {
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<ApiResponsePublicJobSourceListResponse> getJobSources({
+    bool activeOnly = false,
+  }) async {
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<ApiResponseRecommendationJobResponse> addBookmark(
+    Map<String, Object?> body,
+  ) async {
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<HttpResponse<dynamic>> removeBookmark(int jobId) async {
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<ApiResponseRecommendationJobListResponse> getJobBookmarks({
+    String? query,
+    String? postingType,
+    String? sort,
+    int page = 0,
+    int size = 20,
+  }) async {
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<ApiResponseAiReanalysisResponse> requestAiReanalysis(int jobId) async {
     throw UnimplementedError();
   }
 }

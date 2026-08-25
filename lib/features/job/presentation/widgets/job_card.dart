@@ -21,7 +21,7 @@ class JobCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isSchool = job.source == JobSource.school;
+    final isSchool = job.applicationMethod == JobApplicationMethod.internal;
     return Opacity(
       opacity: job.isClosed ? 0.6 : 1,
       child: Material(
