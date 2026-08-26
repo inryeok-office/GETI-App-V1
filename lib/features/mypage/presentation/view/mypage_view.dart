@@ -60,7 +60,13 @@ class MyPageView extends ConsumerWidget {
   Future<void> _onLogout(BuildContext context, WidgetRef ref) async {
     final confirmed = await LogoutConfirmDialog.show(context);
     if (!confirmed) return;
-    ref.read(authViewModelProvider.notifier).reset();
+    final viewModel = ref.read(authViewModelProvider.notifier);
+    try {
+      await viewModel.logout();
+    } catch (_) {
+      // 로그아웃 API 호출이 실패해도 로컬 상태는 초기화하고 로그인 화면으로 보냅니다.
+    }
+    viewModel.reset();
     if (!context.mounted) return;
     context.go('/login');
   }

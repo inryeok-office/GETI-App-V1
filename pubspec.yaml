@@ -48,6 +48,7 @@ dependencies:
   riverpod_annotation: 4.0.2
   shared_preferences: ^2.5.5
   url_launcher: ^6.3.2
+  webview_flutter: ^4.14.1
 
 dev_dependencies:
   # 2.15.2+ requires an analyzer/meta combination newer than Flutter 3.44.6.

@@ -1,24 +1,53 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:geti_app/core/storage/auth_token_storage.dart';
 import 'package:geti_app/features/auth/presentation/view_model/auth_view_model.dart';
 import 'package:geti_app/shared/theme/app_colors.dart';
 import 'package:geti_app/shared/theme/app_spacing.dart';
 import 'package:geti_app/shared/theme/app_typography.dart';
 import 'package:go_router/go_router.dart';
 
-class LoginView extends ConsumerWidget {
+class LoginView extends ConsumerStatefulWidget {
   const LoginView({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<LoginView> createState() => _LoginViewState();
+}
+
+class _LoginViewState extends ConsumerState<LoginView> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback(
+      (_) => _skipIfAlreadyLoggedIn(),
+    );
+  }
+
+  /// 저장된 토큰이 있으면 로그인 화면을 건너뛰고 홈으로 이동합니다. 토큰이
+  /// 만료됐더라도 이후 API 호출에서 기존 401 → Refresh/재로그인 흐름이
+  /// 처리하므로 여기서는 로컬 저장소의 존재 여부만 확인합니다(네트워크
+  /// 클라이언트가 필요 없습니다).
+  Future<void> _skipIfAlreadyLoggedIn() async {
+    try {
+      final accessToken = await ref
+          .read(authTokenStorageProvider)
+          .readAccessToken();
+      if (accessToken == null || !mounted) return;
+      context.go('/');
+    } catch (_) {
+      // 저장소를 읽지 못하면 평소처럼 로그인 화면을 보여줍니다.
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     ref.listen(authViewModelProvider, (previous, next) {
       switch (next.loginResult) {
         case AuthLoginResult.existingMember:
           context.go('/');
         case AuthLoginResult.needsProfileCompletion:
-          context.push('/login/profile-guide');
+          context.go('/login/profile-guide');
         case null:
           break;
       }
@@ -61,7 +90,8 @@ class LoginView extends ConsumerWidget {
                 SizedBox(height: AppSpacing.xxl.h),
                 if (state.screenStatus == AuthScreenStatus.error) ...[
                   Text(
-                    '로그인에 실패했어요. 다시 시도해 주세요.',
+                    state.errorMessage ?? '로그인에 실패했어요. 다시 시도해 주세요.',
+                    textAlign: TextAlign.center,
                     style: AppTypography.body.copyWith(color: AppColors.error),
                   ),
                   SizedBox(height: AppSpacing.md.h),
@@ -72,9 +102,7 @@ class LoginView extends ConsumerWidget {
                   child: ElevatedButton(
                     onPressed: isLoading
                         ? null
-                        : () => viewModel.loginWithSchoolOAuth(
-                            asExistingMember: true,
-                          ),
+                        : () => _startLogin(context, viewModel),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppColors.primary,
                       foregroundColor: AppColors.onPrimary,
@@ -103,28 +131,20 @@ class LoginView extends ConsumerWidget {
                           ),
                   ),
                 ),
-                // TODO(design): Figma에서 신규/기존 회원 분기 UI가 확정되면 제거하고
-                // 실제 인증 응답에 따라 자동 분기하도록 교체합니다.
-                // kDebugMode로 감싸 실제 사용자에게는 노출되지 않도록 합니다.
-                if (kDebugMode)
-                  TextButton(
-                    onPressed: isLoading
-                        ? null
-                        : () => viewModel.loginWithSchoolOAuth(
-                            asExistingMember: false,
-                          ),
-                    child: Text(
-                      '(Mock) 최초 로그인 시나리오로 보기',
-                      style: AppTypography.caption.copyWith(
-                        color: AppColors.neutral500,
-                      ),
-                    ),
-                  ),
               ],
             ),
           ),
         ),
       ),
     );
+  }
+
+  Future<void> _startLogin(
+    BuildContext context,
+    AuthViewModel viewModel,
+  ) async {
+    final authorizationUrl = await viewModel.startOAuthLogin();
+    if (authorizationUrl == null || !context.mounted) return;
+    await context.push('/login/oauth', extra: authorizationUrl);
   }
 }

@@ -3,12 +3,37 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:geti_app/app/app.dart';
+import 'package:geti_app/app/router/app_router.dart';
 import 'package:geti_app/core/network/session_provider.dart';
+import 'package:geti_app/core/storage/auth_token_storage.dart';
 import 'package:geti_app/features/auth/presentation/view_model/auth_view_model.dart';
 import 'package:geti_app/shared/theme/app_colors.dart';
 
+class _FakeAuthTokenStorage implements AuthTokenStorage {
+  String? accessToken;
+  String? refreshToken;
+
+  @override
+  Future<String?> readAccessToken() async => accessToken;
+
+  @override
+  Future<String?> readRefreshToken() async => refreshToken;
+
+  @override
+  Future<void> saveTokens(AuthTokens tokens) async {
+    accessToken = tokens.accessToken;
+    refreshToken = tokens.refreshToken;
+  }
+
+  @override
+  Future<void> clear() async {
+    accessToken = null;
+    refreshToken = null;
+  }
+}
+
 void main() {
-  testWidgets('기본 경로는 로그인 화면이며, 로그인 후 맞춤 추천 결과를 표시한다', (tester) async {
+  testWidgets('기본 경로는 로그인 화면이다', (tester) async {
     tester.view.physicalSize = const Size(390, 844);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
@@ -18,9 +43,22 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('교내 계정으로 로그인'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
 
-    await tester.tap(find.text('교내 계정으로 로그인'));
-    await tester.pump(const Duration(milliseconds: 800));
+  testWidgets('저장된 로그인 상태로 시작하면 맞춤 추천 결과를 표시한다', (tester) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final tokenStorage = _FakeAuthTokenStorage()..accessToken = 'existing';
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [authTokenStorageProvider.overrideWithValue(tokenStorage)],
+        child: const GetiApp(),
+      ),
+    );
     await tester.pumpAndSettle();
 
     expect(find.text('맞춤 추천'), findsOneWidget);
@@ -58,16 +96,18 @@ void main() {
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
 
-    final container = ProviderContainer();
+    final container = ProviderContainer(
+      overrides: [
+        authTokenStorageProvider.overrideWithValue(
+          _FakeAuthTokenStorage()..accessToken = 'existing',
+        ),
+      ],
+    );
     addTearDown(container.dispose);
 
     await tester.pumpWidget(
       UncontrolledProviderScope(container: container, child: const GetiApp()),
     );
-    await tester.pumpAndSettle();
-
-    await tester.tap(find.text('교내 계정으로 로그인'));
-    await tester.pump(const Duration(milliseconds: 800));
     await tester.pumpAndSettle();
     expect(find.text('맞춤 추천'), findsOneWidget);
 
@@ -77,6 +117,27 @@ void main() {
     expect(find.text('로그인이 만료되었습니다.'), findsOneWidget);
     expect(container.read(sessionExpiredProvider), isFalse);
     expect(container.read(authViewModelProvider).loginResult, isNull);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('OAuth 콜백 화면에 extra 없이 직접 진입하면 로그인 화면으로 돌아간다', (tester) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final container = ProviderContainer();
+    addTearDown(container.dispose);
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(container: container, child: const GetiApp()),
+    );
+    await tester.pumpAndSettle();
+
+    container.read(appRouterProvider).go('/login/oauth');
+    await tester.pumpAndSettle();
+
+    expect(find.text('교내 계정으로 로그인'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 }

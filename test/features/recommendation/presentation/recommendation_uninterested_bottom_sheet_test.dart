@@ -3,9 +3,33 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:geti_app/app/app.dart';
+import 'package:geti_app/core/storage/auth_token_storage.dart';
 import 'package:geti_app/features/recommendation/presentation/view_model/recommendation_view_model.dart';
 import 'package:geti_app/features/recommendation/presentation/view_model/suitability_level.dart';
 import 'package:geti_app/features/recommendation/presentation/widgets/recommendation_uninterested_bottom_sheet.dart';
+
+class _FakeAuthTokenStorage implements AuthTokenStorage {
+  String? accessToken = 'existing';
+  String? refreshToken = 'existing';
+
+  @override
+  Future<String?> readAccessToken() async => accessToken;
+
+  @override
+  Future<String?> readRefreshToken() async => refreshToken;
+
+  @override
+  Future<void> saveTokens(AuthTokens tokens) async {
+    accessToken = tokens.accessToken;
+    refreshToken = tokens.refreshToken;
+  }
+
+  @override
+  Future<void> clear() async {
+    accessToken = null;
+    refreshToken = null;
+  }
+}
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -16,9 +40,15 @@ void main() {
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
 
-    await tester.pumpWidget(const ProviderScope(child: GetiApp()));
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          authTokenStorageProvider.overrideWithValue(_FakeAuthTokenStorage()),
+        ],
+        child: const GetiApp(),
+      ),
+    );
     await tester.pumpAndSettle();
-    await _loginAndSettle(tester);
 
     await tester.tap(find.text('관심 없음').first);
     await tester.pumpAndSettle();
@@ -37,9 +67,15 @@ void main() {
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
 
-    await tester.pumpWidget(const ProviderScope(child: GetiApp()));
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          authTokenStorageProvider.overrideWithValue(_FakeAuthTokenStorage()),
+        ],
+        child: const GetiApp(),
+      ),
+    );
     await tester.pumpAndSettle();
-    await _loginAndSettle(tester);
 
     expect(find.byKey(const ValueKey('bookmark-filled')), findsNothing);
 
@@ -62,7 +98,11 @@ void main() {
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
 
-    final container = ProviderContainer();
+    final container = ProviderContainer(
+      overrides: [
+        authTokenStorageProvider.overrideWithValue(_FakeAuthTokenStorage()),
+      ],
+    );
     addTearDown(container.dispose);
     final subscription = container.listen(
       recommendationViewModelProvider,
@@ -82,8 +122,7 @@ void main() {
     await tester.pumpWidget(
       UncontrolledProviderScope(container: container, child: const GetiApp()),
     );
-    await tester.pump();
-    await _loginAndSettle(tester);
+    await tester.pumpAndSettle();
 
     expect(find.text('해제'), findsOneWidget);
     await tester.pump(const Duration(seconds: 1));
@@ -210,12 +249,6 @@ void main() {
       isFalse,
     );
   });
-}
-
-Future<void> _loginAndSettle(WidgetTester tester) async {
-  await tester.tap(find.text('교내 계정으로 로그인'));
-  await tester.pump(const Duration(milliseconds: 800));
-  await tester.pumpAndSettle();
 }
 
 const _job = RecommendationJob(
