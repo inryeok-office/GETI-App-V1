@@ -222,6 +222,11 @@ class JobViewState {
 class JobViewModel extends _$JobViewModel {
   Timer? _searchDebounce;
 
+  /// 검색어/필터가 바뀔 때마다 새 요청을 보내므로, 먼저 보낸 느린 요청이
+  /// 나중에 도착해 최신 결과를 덮어쓰지 않도록 매 _fetch 호출마다 증가시켜
+  /// "이 결과가 아직 최신 요청에 대한 것인지" 확인하는 데 사용합니다.
+  int _requestId = 0;
+
   @override
   JobViewState build() {
     ref.onDispose(() {
@@ -264,11 +269,14 @@ class JobViewModel extends _$JobViewModel {
 
   Future<void> retry() => _fetch();
 
-  Future<void> toggleBookmark(String jobId) async {
-    final index = state.jobs.indexWhere((job) => job.id == jobId);
-    if (index == -1) return;
-    final job = state.jobs[index];
-    final nextBookmarked = !job.bookmarked;
+  /// [currentlyBookmarked]는 호출하는 화면이 렌더링 중인 공고 카드의 현재
+  /// 상태를 그대로 넘깁니다. 이 목록(state.jobs)에 해당 공고가 없어도(다른
+  /// 화면에서 재사용된 카드 등) API 호출 자체는 항상 수행합니다.
+  Future<void> toggleBookmark(
+    String jobId, {
+    required bool currentlyBookmarked,
+  }) async {
+    final nextBookmarked = !currentlyBookmarked;
     _applyBookmark(jobId, nextBookmarked);
     try {
       final repository = ref.read(jobRepositoryProvider);
@@ -280,7 +288,7 @@ class JobViewModel extends _$JobViewModel {
       }
     } catch (_) {
       if (!ref.mounted) return;
-      _applyBookmark(jobId, job.bookmarked);
+      _applyBookmark(jobId, currentlyBookmarked);
     }
   }
 
@@ -294,6 +302,7 @@ class JobViewModel extends _$JobViewModel {
   }
 
   Future<void> _fetch({bool loadMore = false}) async {
+    final requestId = ++_requestId;
     final requestedPage = loadMore ? state.currentPage + 1 : 0;
     state = state.copyWith(
       screenStatus: loadMore ? state.screenStatus : JobScreenStatus.loading,
@@ -315,7 +324,7 @@ class JobViewModel extends _$JobViewModel {
                 : 'EXTERNAL',
             page: requestedPage,
           );
-      if (!ref.mounted) return;
+      if (!ref.mounted || requestId != _requestId) return;
       final fetched = result.content.map(JobItem.fromSummary).toList();
       state = state.copyWith(
         screenStatus: JobScreenStatus.loaded,
@@ -325,7 +334,7 @@ class JobViewModel extends _$JobViewModel {
         isLoadingMore: false,
       );
     } catch (_) {
-      if (!ref.mounted) return;
+      if (!ref.mounted || requestId != _requestId) return;
       state = state.copyWith(
         screenStatus: loadMore
             ? state.screenStatus

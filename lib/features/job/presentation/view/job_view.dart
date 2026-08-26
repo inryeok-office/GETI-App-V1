@@ -59,8 +59,10 @@ class JobView extends ConsumerWidget {
                           state: state,
                           onRetry: viewModel.retry,
                           onJobTap: (job) => context.push('/jobs/${job.id}'),
-                          onBookmarkTap: (job) =>
-                              viewModel.toggleBookmark(job.id),
+                          onBookmarkTap: (job) => viewModel.toggleBookmark(
+                            job.id,
+                            currentlyBookmarked: job.bookmarked,
+                          ),
                           onLoadMore: viewModel.loadMore,
                         ),
                       ),

@@ -60,7 +60,7 @@ final class CompanyDetailViewModelProvider
 }
 
 String _$companyDetailViewModelHash() =>
-    r'b1ad61f4bc29270be654764df9f5c10c3af35eda';
+    r'6ac392b5e657c009281def1dc4e35fb1c135d14b';
 
 final class CompanyDetailViewModelFamily extends $Family
     with

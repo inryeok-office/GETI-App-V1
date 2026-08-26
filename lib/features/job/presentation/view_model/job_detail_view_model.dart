@@ -1,12 +1,24 @@
 import 'dart:async';
 
 import 'package:dio/dio.dart';
+import 'package:geti_app/core/network/api_error.dart';
 import 'package:geti_app/features/job/data/dto/job_detail_response.dart';
 import 'package:geti_app/features/job/data/job_repository.dart';
 import 'package:geti_app/features/job/presentation/view_model/job_view_model.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 part 'job_detail_view_model.g.dart';
+
+/// HTTP 404뿐 아니라, 서버가 공통 응답 포맷(success:false)으로 내려주는
+/// "찾을 수 없음" 계열 에러 코드도 notFound로 처리합니다.
+bool _isNotFoundError(Object error) {
+  if (error is DioException && error.response?.statusCode == 404) return true;
+  if (error is ApiException &&
+      error.error.code.toUpperCase().contains('NOT_FOUND')) {
+    return true;
+  }
+  return false;
+}
 
 enum JobDetailScreenStatus { loading, loaded, notFound, networkError }
 
@@ -281,8 +293,7 @@ class JobDetailViewModel extends _$JobDetailViewModel {
       );
     } catch (error) {
       if (!ref.mounted) return;
-      final isNotFound =
-          error is DioException && error.response?.statusCode == 404;
+      final isNotFound = _isNotFoundError(error);
       state = state.copyWith(
         screenStatus: isNotFound
             ? JobDetailScreenStatus.notFound

@@ -71,14 +71,17 @@ class _FakeJobRepository implements JobRepository {
     bool activeOnly = false,
   }) async => [];
 
+  final List<int> addBookmarkCalls = [];
+  final List<int> removeBookmarkCalls = [];
+
   @override
-  Future<void> addBookmark(int jobId) {
-    throw UnimplementedError();
+  Future<void> addBookmark(int jobId) async {
+    addBookmarkCalls.add(jobId);
   }
 
   @override
-  Future<void> removeBookmark(int jobId) {
-    throw UnimplementedError();
+  Future<void> removeBookmark(int jobId) async {
+    removeBookmarkCalls.add(jobId);
   }
 
   @override
@@ -247,6 +250,21 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('기업 상세에서 공고를 북마크하면 실제 API가 호출되고 아이콘이 갱신된다', (tester) async {
+    final repository = _FakeJobRepository();
+    // 공고 목록 화면을 거치지 않고 기업 상세로 바로 진입한 상황을
+    // 재현합니다(jobViewModelProvider의 목록에 이 공고가 아직 없을 수 있음).
+    await _pumpRoute(tester, '/companies/naver-cloud', repository);
+
+    await tester.ensureVisible(find.byKey(const ValueKey('job-bookmark-1')));
+    await tester.tap(find.byKey(const ValueKey('job-bookmark-1')));
+    await tester.pumpAndSettle();
+
+    expect(repository.addBookmarkCalls, [1]);
+    expect(find.byKey(const ValueKey('job-bookmark-filled-1')), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('기업 홈페이지 버튼을 누르면 이동 안내를 표시한다', (tester) async {
     await _pumpRoute(tester, '/companies/naver-cloud');
 
@@ -285,14 +303,20 @@ GoRouter _buildRouter({required String initialLocation}) => GoRouter(
   ],
 );
 
-Future<void> _pumpRoute(WidgetTester tester, String initialLocation) async {
+Future<void> _pumpRoute(
+  WidgetTester tester,
+  String initialLocation, [
+  JobRepository? repository,
+]) async {
   await _setViewport(tester);
   final router = _buildRouter(initialLocation: initialLocation);
   addTearDown(router.dispose);
   await tester.pumpWidget(
     ProviderScope(
       overrides: [
-        jobRepositoryProvider.overrideWithValue(_FakeJobRepository()),
+        jobRepositoryProvider.overrideWithValue(
+          repository ?? _FakeJobRepository(),
+        ),
       ],
       child: ScreenUtilInit(
         designSize: const Size(390, 844),

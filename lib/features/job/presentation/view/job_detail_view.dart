@@ -918,7 +918,9 @@ class _JobDetailAction extends StatelessWidget {
 
   void _onApply(BuildContext context, bool isSchool) {
     if (isSchool) {
-      context.push('/applications');
+      // 어떤 공고에 대한 지원서 작성/이어쓰기인지 다음 화면(Application
+      // 도메인)이 알 수 있도록 jobId를 함께 전달합니다.
+      context.push('/applications?jobId=${job.id}');
       return;
     }
     showDialog<void>(

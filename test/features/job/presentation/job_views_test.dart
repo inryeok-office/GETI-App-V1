@@ -1,8 +1,11 @@
+import 'dart:async';
+
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:geti_app/core/network/api_error.dart';
 import 'package:geti_app/features/job/data/dto/ai_reanalysis_response.dart';
 import 'package:geti_app/features/job/data/dto/job_detail_response.dart';
 import 'package:geti_app/features/job/data/dto/job_search_response.dart';
@@ -12,6 +15,7 @@ import 'package:geti_app/features/job/data/job_repository.dart';
 import 'package:geti_app/features/job/presentation/view/job_bookmark_view.dart';
 import 'package:geti_app/features/job/presentation/view/job_detail_view.dart';
 import 'package:geti_app/features/job/presentation/view/job_view.dart';
+import 'package:geti_app/features/job/presentation/view_model/job_view_model.dart';
 import 'package:geti_app/shared/widgets/app_bottom_navigation.dart';
 import 'package:go_router/go_router.dart';
 import 'package:url_launcher_platform_interface/link.dart';
@@ -39,6 +43,7 @@ class _FakeJobRepository implements JobRepository {
   final Map<int, JobDetailResponse> retryResults = {};
   List<RecommendationJobResponse> bookmarks = [];
   bool searchShouldFail = false;
+  Object? getJobDetailError;
 
   @override
   Future<JobSearchResponse> searchJobs({
@@ -83,6 +88,7 @@ class _FakeJobRepository implements JobRepository {
 
   @override
   Future<JobDetailResponse> getJobDetail(int jobId) async {
+    if (getJobDetailError != null) throw getJobDetailError!;
     final detail = details[jobId];
     if (detail == null) {
       throw DioException(
@@ -191,6 +197,75 @@ class _FakeJobRepository implements JobRepository {
     );
   }
 }
+
+class _SequencedSearchRepository implements JobRepository {
+  final List<Completer<JobSearchResponse>> pendingCompleters = [];
+
+  @override
+  Future<JobSearchResponse> searchJobs({
+    String? query,
+    String? postingType,
+    String? applicationMethod,
+    String? sourceName,
+    String? sort,
+    String? direction,
+    int page = 0,
+    int size = 20,
+  }) {
+    final completer = Completer<JobSearchResponse>();
+    pendingCompleters.add(completer);
+    return completer.future;
+  }
+
+  @override
+  Future<JobDetailResponse> getJobDetail(int jobId) =>
+      throw UnimplementedError();
+
+  @override
+  Future<List<PublicJobSourceResponse>> getJobSources({
+    bool activeOnly = false,
+  }) => throw UnimplementedError();
+
+  @override
+  Future<void> addBookmark(int jobId) => throw UnimplementedError();
+
+  @override
+  Future<void> removeBookmark(int jobId) => throw UnimplementedError();
+
+  @override
+  Future<RecommendationJobListResponse> getJobBookmarks({
+    String? query,
+    String? postingType,
+    String? sort,
+    int page = 0,
+    int size = 20,
+  }) => throw UnimplementedError();
+
+  @override
+  Future<AiReanalysisResponse> requestAiReanalysis(int jobId) =>
+      throw UnimplementedError();
+}
+
+JobSearchResponse _searchResponseWithTitles(List<String> titles) =>
+    JobSearchResponse(
+      content: [
+        for (var i = 0; i < titles.length; i++)
+          JobSummaryResponse(
+            jobId: i + 1,
+            title: titles[i],
+            postingType: 'GENERAL',
+            applicationMethod: 'EXTERNAL',
+            status: 'PUBLISHED',
+            application: _companyEligible,
+          ),
+      ],
+      page: 0,
+      size: 20,
+      totalElements: titles.length,
+      totalPages: 1,
+      first: true,
+      last: true,
+    );
 
 const _companyEligible = JobEligibilitySnapshotDto(
   canApply: true,
@@ -372,14 +447,14 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('학교 공고 상세에서 지원서 작성하기는 지원 목록으로 이동한다', (tester) async {
+  testWidgets('학교 공고 상세에서 지원서 작성하기는 jobId와 함께 지원 목록으로 이동한다', (tester) async {
     await _pumpRoute(tester, '/jobs/1', repository);
     await tester.pumpAndSettle();
 
     await tester.tap(find.byKey(const ValueKey('job-detail-apply')));
     await tester.pumpAndSettle();
 
-    expect(find.text('내 지원 목록'), findsOneWidget);
+    expect(find.text('내 지원 목록 (jobId=1)'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
@@ -432,6 +507,20 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('해당 공고를 찾을 수 없습니다.'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('서버가 공통 응답 포맷의 NOT_FOUND 에러로 응답해도 찾을 수 없음 안내를 표시한다', (
+    tester,
+  ) async {
+    repository.getJobDetailError = const ApiException(
+      ApiErrorBody(code: 'JOB_NOT_FOUND', message: '공고를 찾을 수 없습니다.'),
+    );
+    await _pumpRoute(tester, '/jobs/1', repository);
+    await tester.pumpAndSettle();
+
+    expect(find.text('해당 공고를 찾을 수 없습니다.'), findsOneWidget);
+    expect(find.text('공고를 불러오지 못했어요.'), findsNothing);
     expect(tester.takeException(), isNull);
   });
 
@@ -667,6 +756,43 @@ void main() {
     expect(find.text('북마크한 공고가 없습니다.'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
+
+  test('느린 이전 필터 응답이 늦게 도착해도 최신 필터 결과를 덮어쓰지 않는다', () async {
+    final sequencedRepository = _SequencedSearchRepository();
+    final container = ProviderContainer(
+      overrides: [jobRepositoryProvider.overrideWithValue(sequencedRepository)],
+    );
+    addTearDown(container.dispose);
+    final subscription = container.listen(jobViewModelProvider, (_, _) {});
+    addTearDown(subscription.close);
+
+    final notifier = container.read(jobViewModelProvider.notifier);
+    await Future<void>.delayed(Duration.zero);
+    expect(sequencedRepository.pendingCompleters.length, 1); // build()의 초기 요청
+
+    notifier.updatePostingTypeFilter(JobPostingType.mou);
+    notifier.updatePostingTypeFilter(JobPostingType.school);
+    expect(sequencedRepository.pendingCompleters.length, 3);
+
+    // 최신 요청(교내)이 먼저 도착합니다.
+    sequencedRepository.pendingCompleters[2].complete(
+      _searchResponseWithTitles(['최신 결과']),
+    );
+    await Future<void>.delayed(Duration.zero);
+
+    // 뒤늦게 이전 요청(MOU)이 도착해도 최신 결과를 덮어쓰면 안 됩니다.
+    sequencedRepository.pendingCompleters[1].complete(
+      _searchResponseWithTitles(['오래된 결과']),
+    );
+    await Future<void>.delayed(Duration.zero);
+
+    final titles = container
+        .read(jobViewModelProvider)
+        .jobs
+        .map((job) => job.title)
+        .toList();
+    expect(titles, ['최신 결과']);
+  });
 }
 
 JobDetailResponse _detailFor(JobSummaryResponse summary) {
@@ -743,8 +869,14 @@ GoRouter _buildRouter({required String initialLocation}) => GoRouter(
     ),
     GoRoute(
       path: '/applications',
-      builder: (context, state) =>
-          const Scaffold(body: Center(child: Text('내 지원 목록'))),
+      builder: (context, state) => Scaffold(
+        body: Center(
+          child: Text(
+            '내 지원 목록'
+            '${state.uri.queryParameters['jobId'] != null ? ' (jobId=${state.uri.queryParameters['jobId']})' : ''}',
+          ),
+        ),
+      ),
     ),
     GoRoute(
       path: '/jobs',
