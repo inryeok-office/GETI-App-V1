@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:geti_app/features/company/presentation/view_model/company_view_model.dart';
+import 'package:geti_app/features/job/data/job_repository.dart';
 import 'package:geti_app/features/job/presentation/view_model/job_view_model.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
@@ -32,6 +33,13 @@ class CompanyDetailViewState {
   /// 별도로 관리하지 않고 jobViewModelProvider의 jobs를 기업명으로 필터링한
   /// 결과입니다. 목록/상세가 같은 소스를 보도록 유지합니다.
   final List<JobItem> jobs;
+
+  CompanyDetailViewState copyWith({List<JobItem>? jobs}) =>
+      CompanyDetailViewState(
+        company: company,
+        detail: detail,
+        jobs: jobs ?? this.jobs,
+      );
 }
 
 @riverpod
@@ -51,6 +59,38 @@ class CompanyDetailViewModel extends _$CompanyDetailViewModel {
       company: company,
       detail: company == null ? null : mockCompanyDetails[companyId],
       jobs: jobs,
+    );
+  }
+
+  /// 이 화면이 보여주는 공고 카드는 jobViewModelProvider의 현재 목록에
+  /// 없을 수도 있으므로(다른 필터/페이지 상태), 그 목록에서 찾아 토글하지
+  /// 않고 이 화면 자신의 jobs를 직접 갱신하면서 API를 호출합니다.
+  Future<void> toggleBookmark(
+    String jobId, {
+    required bool currentlyBookmarked,
+  }) async {
+    final nextBookmarked = !currentlyBookmarked;
+    _applyBookmark(jobId, nextBookmarked);
+    try {
+      final repository = ref.read(jobRepositoryProvider);
+      final id = int.parse(jobId);
+      if (nextBookmarked) {
+        await repository.addBookmark(id);
+      } else {
+        await repository.removeBookmark(id);
+      }
+    } catch (_) {
+      if (!ref.mounted) return;
+      _applyBookmark(jobId, currentlyBookmarked);
+    }
+  }
+
+  void _applyBookmark(String jobId, bool bookmarked) {
+    state = state.copyWith(
+      jobs: [
+        for (final job in state.jobs)
+          if (job.id == jobId) job.copyWith(bookmarked: bookmarked) else job,
+      ],
     );
   }
 }

@@ -4,8 +4,102 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:geti_app/features/company/presentation/view/company_detail_view.dart';
 import 'package:geti_app/features/company/presentation/view/company_view.dart';
+import 'package:geti_app/features/job/data/dto/ai_reanalysis_response.dart';
+import 'package:geti_app/features/job/data/dto/job_detail_response.dart';
+import 'package:geti_app/features/job/data/dto/job_search_response.dart';
+import 'package:geti_app/features/job/data/dto/job_source_response.dart';
+import 'package:geti_app/features/job/data/dto/recommendation_job_response.dart';
+import 'package:geti_app/features/job/data/job_repository.dart';
 import 'package:geti_app/features/job/presentation/view/job_detail_view.dart';
 import 'package:go_router/go_router.dart';
+
+const _companyEligible = JobEligibilitySnapshotDto(
+  canApply: true,
+  eligibilityReason: 'AVAILABLE',
+  eligibilityMessage: '지원 가능한 공고입니다.',
+);
+
+class _FakeJobRepository implements JobRepository {
+  final List<JobSummaryResponse> jobs = [
+    JobSummaryResponse(
+      jobId: 1,
+      title: '2026 AI 서비스 개발 인턴십 참가자 모집',
+      postingType: 'GENERAL',
+      applicationMethod: 'EXTERNAL',
+      status: 'PUBLISHED',
+      company: const CompanySummaryDto(companyId: 1, name: '네이버클라우드'),
+      application: _companyEligible,
+    ),
+    JobSummaryResponse(
+      jobId: 2,
+      title: '웹 프론트엔드 주니어 개발자 채용',
+      postingType: 'GENERAL',
+      applicationMethod: 'EXTERNAL',
+      status: 'CLOSED',
+      company: const CompanySummaryDto(companyId: 2, name: '우아한형제들'),
+      application: _companyEligible,
+    ),
+  ];
+
+  @override
+  Future<JobSearchResponse> searchJobs({
+    String? query,
+    String? postingType,
+    String? applicationMethod,
+    String? sourceName,
+    String? sort,
+    String? direction,
+    int page = 0,
+    int size = 20,
+  }) async => JobSearchResponse(
+    content: jobs,
+    page: 0,
+    size: size,
+    totalElements: jobs.length,
+    totalPages: 1,
+    first: true,
+    last: true,
+  );
+
+  @override
+  Future<JobDetailResponse> getJobDetail(int jobId) {
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<List<PublicJobSourceResponse>> getJobSources({
+    bool activeOnly = false,
+  }) async => [];
+
+  final List<int> addBookmarkCalls = [];
+  final List<int> removeBookmarkCalls = [];
+
+  @override
+  Future<void> addBookmark(int jobId) async {
+    addBookmarkCalls.add(jobId);
+  }
+
+  @override
+  Future<void> removeBookmark(int jobId) async {
+    removeBookmarkCalls.add(jobId);
+  }
+
+  @override
+  Future<RecommendationJobListResponse> getJobBookmarks({
+    String? query,
+    String? postingType,
+    String? sort,
+    int page = 0,
+    int size = 20,
+  }) {
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<AiReanalysisResponse> requestAiReanalysis(int jobId) {
+    throw UnimplementedError();
+  }
+}
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -156,6 +250,21 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('기업 상세에서 공고를 북마크하면 실제 API가 호출되고 아이콘이 갱신된다', (tester) async {
+    final repository = _FakeJobRepository();
+    // 공고 목록 화면을 거치지 않고 기업 상세로 바로 진입한 상황을
+    // 재현합니다(jobViewModelProvider의 목록에 이 공고가 아직 없을 수 있음).
+    await _pumpRoute(tester, '/companies/naver-cloud', repository);
+
+    await tester.ensureVisible(find.byKey(const ValueKey('job-bookmark-1')));
+    await tester.tap(find.byKey(const ValueKey('job-bookmark-1')));
+    await tester.pumpAndSettle();
+
+    expect(repository.addBookmarkCalls, [1]);
+    expect(find.byKey(const ValueKey('job-bookmark-filled-1')), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('기업 홈페이지 버튼을 누르면 이동 안내를 표시한다', (tester) async {
     await _pumpRoute(tester, '/companies/naver-cloud');
 
@@ -194,12 +303,21 @@ GoRouter _buildRouter({required String initialLocation}) => GoRouter(
   ],
 );
 
-Future<void> _pumpRoute(WidgetTester tester, String initialLocation) async {
+Future<void> _pumpRoute(
+  WidgetTester tester,
+  String initialLocation, [
+  JobRepository? repository,
+]) async {
   await _setViewport(tester);
   final router = _buildRouter(initialLocation: initialLocation);
   addTearDown(router.dispose);
   await tester.pumpWidget(
     ProviderScope(
+      overrides: [
+        jobRepositoryProvider.overrideWithValue(
+          repository ?? _FakeJobRepository(),
+        ),
+      ],
       child: ScreenUtilInit(
         designSize: const Size(390, 844),
         builder: (context, _) => MaterialApp.router(routerConfig: router),

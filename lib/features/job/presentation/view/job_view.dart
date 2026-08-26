@@ -59,8 +59,11 @@ class JobView extends ConsumerWidget {
                           state: state,
                           onRetry: viewModel.retry,
                           onJobTap: (job) => context.push('/jobs/${job.id}'),
-                          onBookmarkTap: (job) =>
-                              viewModel.toggleBookmark(job.id),
+                          onBookmarkTap: (job) => viewModel.toggleBookmark(
+                            job.id,
+                            currentlyBookmarked: job.bookmarked,
+                          ),
+                          onLoadMore: viewModel.loadMore,
                         ),
                       ),
                     ],
@@ -97,31 +100,36 @@ class _JobFilterRow extends StatelessWidget {
         children: [
           _JobFilterChip(
             key: const ValueKey('job-type-filter'),
-            label: '유형 ${state.typeFilter ?? '전체'}',
-            selected: state.typeFilter != null,
+            label: '유형 ${_postingTypeLabel(state.postingTypeFilter)}',
+            selected: state.postingTypeFilter != null,
             onTap: () => _showOptionSheet(
               context: context,
               title: '공고 유형',
-              options: ['전체', ...state.availableTypes],
-              selectedLabel: state.typeFilter ?? '전체',
+              options: const ['전체', '일반', 'MOU', '교내'],
+              selectedLabel: _postingTypeLabel(state.postingTypeFilter),
               onSelected: (label) =>
-                  viewModel.updateTypeFilter(label == '전체' ? null : label),
+                  viewModel.updatePostingTypeFilter(switch (label) {
+                    '일반' => JobPostingType.general,
+                    'MOU' => JobPostingType.mou,
+                    '교내' => JobPostingType.school,
+                    _ => null,
+                  }),
             ),
           ),
           SizedBox(width: 8.w),
           _JobFilterChip(
             key: const ValueKey('job-source-filter'),
-            label: '출처 ${_sourceLabel(state.sourceFilter)}',
-            selected: state.sourceFilter != null,
+            label: '출처 ${_sourceLabel(state.applicationMethodFilter)}',
+            selected: state.applicationMethodFilter != null,
             onTap: () => _showOptionSheet(
               context: context,
               title: '공고 출처',
               options: const ['전체', '학교', '외부'],
-              selectedLabel: _sourceLabel(state.sourceFilter),
+              selectedLabel: _sourceLabel(state.applicationMethodFilter),
               onSelected: (label) =>
-                  viewModel.updateSourceFilter(switch (label) {
-                    '학교' => JobSource.school,
-                    '외부' => JobSource.external,
+                  viewModel.updateApplicationMethodFilter(switch (label) {
+                    '학교' => JobApplicationMethod.internal,
+                    '외부' => JobApplicationMethod.external,
                     _ => null,
                   }),
             ),
@@ -139,11 +147,14 @@ class _JobFilterRow extends StatelessWidget {
     );
   }
 
-  String _sourceLabel(JobSource? source) => switch (source) {
-    JobSource.school => '학교',
-    JobSource.external => '외부',
+  String _sourceLabel(JobApplicationMethod? method) => switch (method) {
+    JobApplicationMethod.internal => '학교',
+    JobApplicationMethod.external => '외부',
     null => '전체',
   };
+
+  String _postingTypeLabel(JobPostingType? type) =>
+      type == null ? '전체' : postingTypeLabel(type);
 
   void _showOptionSheet({
     required BuildContext context,
@@ -256,12 +267,14 @@ class _JobList extends StatelessWidget {
     required this.onRetry,
     required this.onJobTap,
     required this.onBookmarkTap,
+    required this.onLoadMore,
   });
 
   final JobViewState state;
   final VoidCallback onRetry;
   final ValueChanged<JobItem> onJobTap;
   final ValueChanged<JobItem> onBookmarkTap;
+  final VoidCallback onLoadMore;
 
   @override
   Widget build(BuildContext context) {
@@ -275,9 +288,10 @@ class _JobList extends StatelessWidget {
     if (jobs.isEmpty) {
       return const JobEmptySearchState();
     }
+    final showLoadMore = state.hasMore;
     return ListView.separated(
       padding: EdgeInsets.only(bottom: 24.h),
-      itemCount: jobs.length + 1,
+      itemCount: jobs.length + 1 + (showLoadMore ? 1 : 0),
       separatorBuilder: (_, _) => SizedBox(height: 12.h),
       itemBuilder: (context, index) {
         if (index == 0) {
@@ -298,10 +312,22 @@ class _JobList extends StatelessWidget {
             ),
           );
         }
+        if (showLoadMore && index == jobs.length + 1) {
+          return Center(
+            child: TextButton(
+              key: const ValueKey('job-load-more'),
+              onPressed: state.isLoadingMore ? null : onLoadMore,
+              child: Text(
+                state.isLoadingMore ? '불러오는 중...' : '더보기',
+                style: AppTypography.label.copyWith(color: AppColors.primary),
+              ),
+            ),
+          );
+        }
         final job = jobs[index - 1];
         return JobCard(
           job: job,
-          isBookmarked: state.bookmarkedJobIds.contains(job.id),
+          isBookmarked: job.bookmarked,
           onTap: () => onJobTap(job),
           onBookmarkTap: () => onBookmarkTap(job),
         );

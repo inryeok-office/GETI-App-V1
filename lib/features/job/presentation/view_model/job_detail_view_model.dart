@@ -1,8 +1,26 @@
-import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'dart:async';
+
+import 'package:dio/dio.dart';
+import 'package:geti_app/core/network/api_error.dart';
+import 'package:geti_app/features/job/data/dto/job_detail_response.dart';
+import 'package:geti_app/features/job/data/job_repository.dart';
 import 'package:geti_app/features/job/presentation/view_model/job_view_model.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 part 'job_detail_view_model.g.dart';
+
+/// HTTP 404뿐 아니라, 서버가 공통 응답 포맷(success:false)으로 내려주는
+/// "찾을 수 없음" 계열 에러 코드도 notFound로 처리합니다.
+bool _isNotFoundError(Object error) {
+  if (error is DioException && error.response?.statusCode == 404) return true;
+  if (error is ApiException &&
+      error.error.code.toUpperCase().contains('NOT_FOUND')) {
+    return true;
+  }
+  return false;
+}
+
+enum JobDetailScreenStatus { loading, loaded, notFound, networkError }
 
 enum JobAiAnalysisStatus {
   completed,
@@ -20,6 +38,8 @@ class JobAiAnalysis {
     this.preferredSkills = const [],
     this.fitTags = const [],
     this.difficulty,
+    this.canReanalyze = false,
+    this.remainingReanalysisCount = 0,
   });
 
   final JobAiAnalysisStatus status;
@@ -30,6 +50,71 @@ class JobAiAnalysis {
   final List<String> preferredSkills;
   final List<String> fitTags;
   final String? difficulty;
+  final bool canReanalyze;
+  final int remainingReanalysisCount;
+
+  factory JobAiAnalysis.fromSnapshot(JobAiAnalysisSnapshotDto? dto) {
+    if (dto == null) {
+      return const JobAiAnalysis(status: JobAiAnalysisStatus.pending);
+    }
+    final hasContent =
+        (dto.summary != null && dto.summary!.isNotEmpty) ||
+        dto.requiredSkills.isNotEmpty ||
+        dto.preferredSkills.isNotEmpty;
+    final status = switch (dto.status) {
+      'FAILED' => JobAiAnalysisStatus.failed,
+      'COMPLETED' =>
+        hasContent
+            ? JobAiAnalysisStatus.completed
+            : JobAiAnalysisStatus.insufficientInfo,
+      'PROCESSING' when dto.reanalysis => JobAiAnalysisStatus.reanalyzing,
+      _ => JobAiAnalysisStatus.pending,
+    };
+    return JobAiAnalysis(
+      status: status,
+      summary: dto.summary,
+      requiredSkills: dto.requiredSkills.map((skill) => skill.name).toList(),
+      preferredSkills: dto.preferredSkills.map((skill) => skill.name).toList(),
+      fitTags: [
+        ..._fitTags('고졸', dto.highSchoolGraduateFit),
+        ..._fitTags('신입', dto.entryLevelFit),
+      ],
+      difficulty: _difficultyLabel(dto.difficulty),
+      canReanalyze: dto.canReanalyze,
+      remainingReanalysisCount: dto.remainingReanalysisCount,
+    );
+  }
+
+  static List<String> _fitTags(String axis, String? level) => switch (level) {
+    'SUITABLE' => ['$axis 지원 가능'],
+    'CONDITIONAL' => ['$axis 조건부 지원 가능'],
+    'UNSUITABLE' => ['$axis 지원 비권장'],
+    _ => const [],
+  };
+
+  static String? _difficultyLabel(String? raw) => switch (raw) {
+    'EASY' => '쉬움',
+    'NORMAL' => '보통',
+    'HARD' => '어려움',
+    _ => null,
+  };
+}
+
+class JobAttachment {
+  const JobAttachment({required this.name, required this.sizeLabel});
+  final String name;
+  final String sizeLabel;
+
+  factory JobAttachment.fromDto(JobFileDto dto) =>
+      JobAttachment(name: dto.originalName, sizeLabel: _formatBytes(dto.size));
+
+  static String _formatBytes(int bytes) {
+    if (bytes < 1024) return '$bytes B';
+    final kb = bytes / 1024;
+    if (kb < 1024) return '${kb.toStringAsFixed(1)}KB';
+    final mb = kb / 1024;
+    return '${mb.toStringAsFixed(1)}MB';
+  }
 }
 
 class JobDetail {
@@ -37,29 +122,15 @@ class JobDetail {
     required this.recruitmentPeriod,
     required this.applicationTypeLabel,
     required this.description,
-    required this.responsibilities,
-    required this.qualifications,
-    required this.preferredQualifications,
-    required this.workConditions,
-    required this.hiringProcess,
-    required this.aiAnalysis,
     this.sourceName,
     this.externalUrl,
     this.targetAudience,
-    this.attachmentName,
-    this.attachmentDescription,
-    this.baseViewCount = 0,
+    this.attachments = const [],
   });
 
   final String recruitmentPeriod;
   final String applicationTypeLabel;
   final String description;
-  final List<String> responsibilities;
-  final List<String> qualifications;
-  final List<String> preferredQualifications;
-  final List<String> workConditions;
-  final List<String> hiringProcess;
-  final JobAiAnalysis aiAnalysis;
 
   /// 외부 공고에서만 사용됩니다.
   final String? sourceName;
@@ -68,38 +139,68 @@ class JobDetail {
   /// 학교 공고에서만 사용됩니다.
   final String? targetAudience;
 
-  /// 첨부파일이 없으면 null이며, 상세 화면에서 섹션 자체가 숨겨집니다.
-  final String? attachmentName;
-  final String? attachmentDescription;
+  /// 첨부파일이 없으면 빈 목록이며, 상세 화면에서 섹션 자체가 숨겨집니다.
+  final List<JobAttachment> attachments;
 
-  /// 화면 진입 전까지의 누적 조회수입니다. 실제 조회수는 여기에 이번 세션의
-  /// 진입 횟수를 더해 계산합니다.
-  final int baseViewCount;
+  factory JobDetail.fromResponse(JobDetailResponse response) => JobDetail(
+    recruitmentPeriod: _recruitmentPeriod(response.startDate, response.endDate),
+    applicationTypeLabel: response.applicationMethod == 'INTERNAL'
+        ? '교내 지원서 작성'
+        : '외부 지원',
+    description: response.content ?? '등록된 공고 설명이 없습니다.',
+    sourceName: response.applicationMethod == 'EXTERNAL'
+        ? response.sourceName
+        : null,
+    externalUrl: response.externalUrl,
+    targetAudience: response.targetGrade == null
+        ? null
+        : '광주소프트웨어마이스터고 ${response.targetGrade}학년 재학생',
+    attachments: response.files.map(JobAttachment.fromDto).toList(),
+  );
+
+  static String _recruitmentPeriod(String? startIso, String? endIso) {
+    final start = startIso == null ? null : DateTime.tryParse(startIso);
+    final end = endIso == null ? null : DateTime.tryParse(endIso);
+    if (start == null || end == null) return '상시 모집';
+    return '${_formatDate(start)} ~ ${_formatDate(end)}';
+  }
+
+  static String _formatDate(DateTime date) =>
+      '${date.year}.${date.month.toString().padLeft(2, '0')}.'
+      '${date.day.toString().padLeft(2, '0')}';
 }
 
 class JobDetailViewState {
   const JobDetailViewState({
+    this.screenStatus = JobDetailScreenStatus.loading,
     this.job,
     this.detail,
     this.aiAnalysis,
     this.viewCount = 0,
+    this.reanalyzing = false,
   });
 
+  final JobDetailScreenStatus screenStatus;
   final JobItem? job;
   final JobDetail? detail;
   final JobAiAnalysis? aiAnalysis;
   final int viewCount;
+  final bool reanalyzing;
 
   JobDetailViewState copyWith({
+    JobDetailScreenStatus? screenStatus,
     JobItem? job,
     JobDetail? detail,
     JobAiAnalysis? aiAnalysis,
     int? viewCount,
+    bool? reanalyzing,
   }) => JobDetailViewState(
+    screenStatus: screenStatus ?? this.screenStatus,
     job: job ?? this.job,
     detail: detail ?? this.detail,
     aiAnalysis: aiAnalysis ?? this.aiAnalysis,
     viewCount: viewCount ?? this.viewCount,
+    reanalyzing: reanalyzing ?? this.reanalyzing,
   );
 }
 
@@ -107,166 +208,98 @@ class JobDetailViewState {
 class JobDetailViewModel extends _$JobDetailViewModel {
   @override
   JobDetailViewState build(String jobId) {
-    // 목록과 동일한 jobViewModelProvider의 jobs를 조회해, 목록에서 본 공고와
-    // 상세에서 찾는 공고가 서로 다른 소스로 갈라지지 않도록 합니다. jobs만
-    // select로 좁혀서 watch해, 북마크/검색어 등 jobs와 무관한 상태 변경으로
-    // build()가 다시 실행되어 재시도로 갱신한 aiAnalysis가 초기값으로
-    // 되돌아가는 것을 막습니다. 상세 전용 부가 정보(mockJobDetails)만
-    // 별도로 조회합니다.
-    final jobs = ref.watch(jobViewModelProvider.select((state) => state.jobs));
-    final job = jobs.where((job) => job.id == jobId).firstOrNull;
-    final detail = mockJobDetails[jobId];
-    return JobDetailViewState(
-      job: job,
-      detail: detail,
-      aiAnalysis: detail?.aiAnalysis,
-      viewCount: (detail?.baseViewCount ?? 0) + 1,
-    );
+    unawaited(Future.microtask(_fetch));
+    return const JobDetailViewState();
   }
 
-  /// AI 분석 실패 상태에서 재시도를 흉내내는 Mock 동작입니다.
-  /// 실제 AI 분석 API 연동은 별도 Issue에서 구현합니다.
+  Future<void> retry() => _fetch();
+
+  Future<void> toggleBookmark() async {
+    final job = state.job;
+    if (job == null) return;
+    final nextBookmarked = !job.bookmarked;
+    state = state.copyWith(job: job.copyWith(bookmarked: nextBookmarked));
+    try {
+      final repository = ref.read(jobRepositoryProvider);
+      final id = int.parse(jobId);
+      if (nextBookmarked) {
+        await repository.addBookmark(id);
+      } else {
+        await repository.removeBookmark(id);
+      }
+    } catch (_) {
+      if (!ref.mounted) return;
+      state = state.copyWith(job: job);
+    }
+  }
+
   Future<void> retryAiAnalysis() async {
+    if (state.reanalyzing) return;
     final previousAiAnalysis = state.aiAnalysis;
     state = state.copyWith(
+      reanalyzing: true,
       aiAnalysis: const JobAiAnalysis(status: JobAiAnalysisStatus.reanalyzing),
     );
-    await Future<void>.delayed(const Duration(milliseconds: 800));
-    if (!ref.mounted) return;
-    state = state.copyWith(
-      aiAnalysis: mockRetriedAiAnalysis[jobId] ?? previousAiAnalysis,
-    );
+    try {
+      await ref
+          .read(jobRepositoryProvider)
+          .requestAiReanalysis(int.parse(jobId));
+      if (!ref.mounted) return;
+      await _fetch(preserveScreenStatus: true);
+    } catch (_) {
+      if (!ref.mounted) return;
+      state = state.copyWith(
+        reanalyzing: false,
+        aiAnalysis: previousAiAnalysis,
+      );
+    }
+  }
+
+  Future<void> _fetch({bool preserveScreenStatus = false}) async {
+    if (!preserveScreenStatus) {
+      state = state.copyWith(screenStatus: JobDetailScreenStatus.loading);
+    }
+    try {
+      final response = await ref
+          .read(jobRepositoryProvider)
+          .getJobDetail(int.parse(jobId));
+      if (!ref.mounted) return;
+      state = JobDetailViewState(
+        screenStatus: JobDetailScreenStatus.loaded,
+        job: JobItem(
+          id: response.jobId.toString(),
+          companyName: response.company?.name ?? '기업명 미정',
+          title: response.title,
+          applicationMethod: applicationMethodFrom(response.applicationMethod),
+          postingType: postingTypeFrom(response.postingType),
+          sourceDescriptor: sourceDescriptorFor(
+            response.postingType,
+            response.sourceName,
+          ),
+          location: response.location ?? '지역 미정',
+          jobType: response.employmentType ?? '',
+          deadlineLabel: deadlineLabelsFor(response.endDate).$1,
+          dDayLabel: deadlineLabelsFor(response.endDate).$2,
+          isClosed: response.status == 'CLOSED',
+          canApply: response.application.canApply,
+          eligibilityReason: response.application.canApply
+              ? null
+              : response.application.eligibilityMessage,
+          bookmarked: response.bookmarked,
+        ),
+        detail: JobDetail.fromResponse(response),
+        aiAnalysis: JobAiAnalysis.fromSnapshot(response.aiAnalysis),
+        viewCount: response.viewCount,
+      );
+    } catch (error) {
+      if (!ref.mounted) return;
+      final isNotFound = _isNotFoundError(error);
+      state = state.copyWith(
+        screenStatus: isNotFound
+            ? JobDetailScreenStatus.notFound
+            : JobDetailScreenStatus.networkError,
+        reanalyzing: false,
+      );
+    }
   }
 }
-
-const mockJobDetails = <String, JobDetail>{
-  'kepco-intern': JobDetail(
-    recruitmentPeriod: '2026.07.20 ~ 2026.08.14',
-    applicationTypeLabel: '교내 지원서 작성',
-    targetAudience: '광주소프트웨어마이스터고 3학년 재학생',
-    description: '한국전력공사에서 고졸 채용형 인턴을 모집합니다. 우수 인턴은 정규직 전환 기회가 제공됩니다.',
-    responsibilities: ['전력 IT 시스템 운영 지원', '사내 데이터 정리 및 보고서 작성', '현업 부서 실무 보조'],
-    qualifications: ['고등학교 졸업 예정자 또는 졸업자', '광주소프트웨어마이스터고 재학생'],
-    preferredQualifications: ['컴퓨터활용능력 자격증 보유', '전공 관련 프로젝트 경험'],
-    workConditions: [
-      '근무 형태: 채용형 인턴 (6개월)',
-      '근무 지역: 서울',
-      '모집 기간: 2026.07.20 ~ 2026.08.14',
-    ],
-    hiringProcess: ['서류 심사', '면접', '최종 합격'],
-    attachmentName: 'kepco_intern_guide.pdf',
-    attachmentDescription: '1.2MB',
-    baseViewCount: 128,
-    aiAnalysis: JobAiAnalysis(status: JobAiAnalysisStatus.pending),
-  ),
-  'naver-cloud-intern': JobDetail(
-    recruitmentPeriod: '2026.07.20 ~ 2026.08.20',
-    applicationTypeLabel: '외부 지원',
-    sourceName: '네이버 채용',
-    externalUrl: 'recruit.navercorp.com',
-    description: '네이버클라우드의 AI 서비스 개발 프로젝트에 참여할 인턴을 모집합니다.',
-    responsibilities: [
-      'AI 기반 웹서비스 기능 개발',
-      '프론트엔드 컴포넌트 구현',
-      'API 연동 및 테스트',
-      '팀 코드 리뷰 참여',
-    ],
-    qualifications: [
-      '고등학교 졸업 예정자 또는 졸업자',
-      'JavaScript 기본 이해',
-      'Git을 활용한 협업 경험',
-    ],
-    preferredQualifications: ['React 또는 Next.js 프로젝트 경험', '개인 포트폴리오 보유'],
-    workConditions: [
-      '근무 형태: 체험형 인턴',
-      '근무 지역: 경기도 성남시',
-      '모집 기간: 2026.07.20 ~ 2026.08.20',
-    ],
-    hiringProcess: ['서류 심사', '면접', '최종 합격'],
-    baseViewCount: 342,
-    aiAnalysis: JobAiAnalysis(
-      status: JobAiAnalysisStatus.completed,
-      summary: '웹서비스 개발 경험과 JavaScript 기본 역량을 중요하게 보는 신입·고졸 지원 가능 인턴 공고입니다.',
-      requiredSkills: ['JavaScript', 'Git', '웹 기본 지식'],
-      preferredSkills: ['React', 'Next.js', 'AI API'],
-      fitTags: ['고졸 지원 가능', '신입 지원 가능'],
-      difficulty: '보통',
-    ),
-  ),
-  'woowa-frontend': JobDetail(
-    recruitmentPeriod: '2026.07.01 ~ 2026.08.14',
-    applicationTypeLabel: '외부 지원',
-    sourceName: '우아한형제들 채용',
-    externalUrl: 'career.woowahan.com',
-    description: '배달의민족을 만드는 우아한형제들에서 프론트엔드 주니어 개발자를 채용합니다.',
-    responsibilities: ['서비스 프론트엔드 개발', '컴포넌트 라이브러리 유지보수'],
-    qualifications: ['웹 프론트엔드 개발 경험'],
-    preferredQualifications: ['TypeScript, React 경험'],
-    workConditions: [
-      '근무 형태: 정규직',
-      '근무 지역: 서울',
-      '모집 기간: 2026.07.01 ~ 2026.08.14',
-    ],
-    hiringProcess: ['서류 심사', '코딩 테스트', '면접'],
-    aiAnalysis: JobAiAnalysis(status: JobAiAnalysisStatus.failed),
-  ),
-  'gsw-portfolio': JobDetail(
-    recruitmentPeriod: '2026.07.15 ~ 2026.08.31',
-    applicationTypeLabel: '교내 지원서 작성',
-    targetAudience: '광주소프트웨어마이스터고 졸업예정자',
-    description: '교내 MOU 연계 기업이 포트폴리오 우수자를 대상으로 정규직 채용을 진행합니다.',
-    responsibilities: ['제품 개발팀 실무 투입', '포트폴리오 기반 과제 수행'],
-    qualifications: ['졸업 예정자', '개인 포트폴리오 보유'],
-    preferredQualifications: ['수상 경력 또는 대외 활동 경험'],
-    workConditions: [
-      '근무 형태: 정규직',
-      '근무 지역: 광주',
-      '모집 기간: 2026.07.15 ~ 2026.08.31',
-    ],
-    hiringProcess: ['서류 심사', '포트폴리오 심사', '면접', '최종 합격'],
-    aiAnalysis: JobAiAnalysis(status: JobAiAnalysisStatus.insufficientInfo),
-  ),
-  // 목록(mockJobs)에는 대응하는 JobItem이 없어 실제 화면에서는 도달할 수
-  // 없습니다. mockRetriedAiAnalysis에 결과가 없을 때 retryAiAnalysis()가
-  // reanalyzing에 멈추지 않고 이전 상태로 되돌아가는지 검증하기 위한
-  // 테스트 전용 Mock입니다.
-  'analysis-failed-no-retry-mock': JobDetail(
-    recruitmentPeriod: '2026.07.01 ~ 2026.08.14',
-    applicationTypeLabel: '외부 지원',
-    description: 'retryAiAnalysis()의 fallback 동작을 검증하기 위한 테스트 전용 Mock입니다.',
-    responsibilities: [],
-    qualifications: [],
-    preferredQualifications: [],
-    workConditions: [],
-    hiringProcess: [],
-    aiAnalysis: JobAiAnalysis(status: JobAiAnalysisStatus.failed),
-  ),
-  'toss-payments-fe': JobDetail(
-    recruitmentPeriod: '2026.08.10 ~ 2026.08.25',
-    applicationTypeLabel: '교내 지원서 작성',
-    targetAudience: '광주소프트웨어마이스터고 3학년 재학생',
-    description: '토스페이먼츠에서 3학년 대상 프론트엔드 채용형 인턴을 모집합니다.',
-    responsibilities: ['결제 서비스 프론트엔드 개발', '내부 도구 UI 개선'],
-    qualifications: ['광주소프트웨어마이스터고 3학년 재학생'],
-    preferredQualifications: ['TypeScript 경험'],
-    workConditions: [
-      '근무 형태: 채용형 인턴',
-      '근무 지역: 서울',
-      '모집 기간: 2026.08.10 ~ 2026.08.25',
-    ],
-    hiringProcess: ['서류 심사', '면접', '최종 합격'],
-    aiAnalysis: JobAiAnalysis(status: JobAiAnalysisStatus.pending),
-  ),
-};
-
-/// 분석 실패 공고를 재시도했을 때 도달하는 Mock 결과입니다.
-const mockRetriedAiAnalysis = <String, JobAiAnalysis>{
-  'woowa-frontend': JobAiAnalysis(
-    status: JobAiAnalysisStatus.completed,
-    summary: '프론트엔드 실무 경험과 TypeScript 활용 능력을 중요하게 보는 정규직 신입 공고입니다.',
-    requiredSkills: ['HTML/CSS', 'JavaScript', '웹 프론트엔드 개발 경험'],
-    preferredSkills: ['TypeScript', 'React'],
-    fitTags: ['신입 지원 가능'],
-    difficulty: '어려움',
-  ),
-};

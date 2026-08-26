@@ -51,6 +51,7 @@ class CompanyDetailView extends ConsumerWidget {
       body: company == null || detail == null
           ? const _CompanyNotFound()
           : _CompanyDetailBody(
+              companyId: companyId,
               company: company,
               detail: detail,
               jobs: state.jobs,
@@ -87,11 +88,13 @@ class _CompanyNotFound extends StatelessWidget {
 
 class _CompanyDetailBody extends ConsumerWidget {
   const _CompanyDetailBody({
+    required this.companyId,
     required this.company,
     required this.detail,
     required this.jobs,
   });
 
+  final String companyId;
   final CompanyItem company;
   final CompanyDetail detail;
   final List<JobItem> jobs;
@@ -127,15 +130,18 @@ class _CompanyDetailBody extends ConsumerWidget {
                     for (final job in jobs) ...[
                       JobCard(
                         job: job,
-                        isBookmarked: ref.watch(
-                          jobViewModelProvider.select(
-                            (s) => s.bookmarkedJobIds.contains(job.id),
-                          ),
-                        ),
+                        isBookmarked: job.bookmarked,
                         onTap: () => context.push('/jobs/${job.id}'),
                         onBookmarkTap: () => ref
-                            .read(jobViewModelProvider.notifier)
-                            .toggleBookmark(job.id),
+                            .read(
+                              companyDetailViewModelProvider(
+                                companyId,
+                              ).notifier,
+                            )
+                            .toggleBookmark(
+                              job.id,
+                              currentlyBookmarked: job.bookmarked,
+                            ),
                       ),
                       SizedBox(height: 12.h),
                     ],
