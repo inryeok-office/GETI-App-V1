@@ -124,6 +124,26 @@ void main() {
     expect(tokenStorage.refreshToken, 'new-refresh');
   });
 
+  test('OAuth 인가/콜백 같은 공개 인증 요청의 401은 SessionExpired를 바꾸지 않는다', () async {
+    final container = ProviderContainer();
+    addTearDown(container.dispose);
+
+    final dio = container.read(dioProvider);
+    dio.httpClientAdapter = _UnauthorizedAdapter();
+
+    await expectLater(
+      dio.get<void>('/api/v1/auth/dg/authorize'),
+      throwsA(isA<DioException>()),
+    );
+    expect(container.read(sessionExpiredProvider), isFalse);
+
+    await expectLater(
+      dio.get<void>('/api/v1/auth/dg/callback'),
+      throwsA(isA<DioException>()),
+    );
+    expect(container.read(sessionExpiredProvider), isFalse);
+  });
+
   test('401이 아닌 오류는 SessionExpired 상태를 바꾸지 않는다', () async {
     final container = ProviderContainer();
     addTearDown(container.dispose);

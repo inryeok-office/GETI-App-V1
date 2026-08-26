@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:geti_app/core/config/app_config.dart';
 import 'package:geti_app/features/auth/presentation/view_model/auth_view_model.dart';
 import 'package:geti_app/shared/theme/app_colors.dart';
 import 'package:webview_flutter/webview_flutter.dart';
@@ -45,11 +46,23 @@ class _OAuthWebViewPageState extends ConsumerState<OAuthWebViewPage> {
 
   NavigationDecision _onNavigationRequest(NavigationRequest request) {
     final uri = Uri.tryParse(request.url);
-    if (uri != null && uri.path.contains('/auth/dg/callback')) {
+    if (uri != null &&
+        uri.path.contains('/auth/dg/callback') &&
+        _isTrustedCallbackHost(uri)) {
       unawaited(_handleCallback(uri));
       return NavigationDecision.prevent;
     }
     return NavigationDecision.navigate;
+  }
+
+  /// 콜백 path만으로는 다른 host의 우연히 같은 path를 가진 페이지도
+  /// 가로챌 수 있으므로, API 서버의 host/scheme까지 확인합니다.
+  bool _isTrustedCallbackHost(Uri uri) {
+    final config = ref.read(appConfigProvider);
+    if (!config.hasApiBaseUrl) return false;
+    final baseUri = Uri.tryParse(config.apiBaseUrl);
+    if (baseUri == null) return false;
+    return uri.host == baseUri.host && uri.scheme == baseUri.scheme;
   }
 
   Future<void> _handleCallback(Uri uri) async {
@@ -59,6 +72,7 @@ class _OAuthWebViewPageState extends ConsumerState<OAuthWebViewPage> {
     final code = uri.queryParameters['code'];
     final state = uri.queryParameters['state'];
     if (code == null || state == null) {
+      ref.read(authViewModelProvider.notifier).reportOAuthFailed();
       if (mounted) Navigator.of(context).pop();
       return;
     }

@@ -7,6 +7,13 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 part 'dio_provider.g.dart';
 
+/// OAuth 인가/콜백처럼 로그인 자체를 시도하는 공개 요청입니다. 이런 요청의
+/// 401은 "기존 로그인 세션 만료"가 아니라 로그인 실패이므로, Refresh
+/// 시도나 전역 세션 만료 처리 대상에서 제외합니다.
+bool _isPublicAuthRequest(String path) =>
+    path.startsWith('/api/v1/auth/') &&
+    (path.endsWith('/authorize') || path.contains('/callback'));
+
 @Riverpod(keepAlive: true)
 Dio dio(Ref ref) {
   final config = ref.watch(appConfigProvider);
@@ -83,8 +90,14 @@ Dio dio(Ref ref) {
         final alreadyRetried = error.requestOptions.extra['retried'] == true;
         final isTokenRefresh =
             error.requestOptions.extra['isTokenRefresh'] == true;
+        final isPublicAuthRequest = _isPublicAuthRequest(
+          error.requestOptions.path,
+        );
 
-        if (isUnauthorized && !alreadyRetried && !isTokenRefresh) {
+        if (isUnauthorized &&
+            !alreadyRetried &&
+            !isTokenRefresh &&
+            !isPublicAuthRequest) {
           final newAccessToken = await refreshAccessToken();
           if (newAccessToken != null) {
             final retryOptions = error.requestOptions

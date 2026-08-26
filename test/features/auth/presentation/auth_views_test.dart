@@ -320,6 +320,17 @@ void main() {
     await tester.pumpAndSettle();
     expect(result, isTrue);
   });
+
+  test('reportOAuthFailed는 에러 상태와 메시지를 설정한다', () {
+    final container = ProviderContainer();
+    addTearDown(container.dispose);
+
+    container.read(authViewModelProvider.notifier).reportOAuthFailed();
+
+    final state = container.read(authViewModelProvider);
+    expect(state.screenStatus, AuthScreenStatus.error);
+    expect(state.errorMessage, '로그인에 실패했어요. 다시 시도해 주세요.');
+  });
 }
 
 Future<void> _pumpRoute(

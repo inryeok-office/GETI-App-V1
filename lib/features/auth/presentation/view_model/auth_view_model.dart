@@ -81,6 +81,15 @@ class AuthViewModel extends _$AuthViewModel {
     }
   }
 
+  /// OAuth 진행 중 사용자가 취소했거나 provider가 오류를 반환해 콜백에서
+  /// code/state를 받지 못했을 때 호출합니다.
+  void reportOAuthFailed() {
+    state = const AuthViewState(
+      screenStatus: AuthScreenStatus.error,
+      errorMessage: '로그인에 실패했어요. 다시 시도해 주세요.',
+    );
+  }
+
   Future<void> logout() => ref.read(authRepositoryProvider).logout();
 
   void reset() => state = const AuthViewState();

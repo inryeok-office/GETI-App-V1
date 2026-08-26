@@ -42,6 +42,10 @@ GoRouter appRouter(Ref ref) {
           GoRoute(
             path: 'oauth',
             name: 'login-oauth',
+            // extra 없이 딥링크·새로고침 등으로 직접 들어오면 로그인 화면으로
+            // 되돌립니다(state.extra!의 null-check crash 방지).
+            redirect: (context, state) =>
+                state.extra is String ? null : '/login',
             builder: (context, state) =>
                 OAuthWebViewPage(authorizationUrl: state.extra! as String),
           ),
