@@ -41,7 +41,7 @@ final class ProgramViewModelProvider
   }
 }
 
-String _$programViewModelHash() => r'1fa59746d342d82c02799e48e9931f0b8e95c0e6';
+String _$programViewModelHash() => r'ad13b08278ebcff0c522f1acb3ad6870fac6b434';
 
 abstract class _$ProgramViewModel extends $Notifier<ProgramViewState> {
   ProgramViewState build();

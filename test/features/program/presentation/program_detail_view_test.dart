@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:geti_app/features/program/data/dto/program_list_response.dart';
+import 'package:geti_app/features/program/data/program_repository.dart';
 import 'package:geti_app/features/program/presentation/view/program_detail_view.dart';
 import 'package:geti_app/features/program/presentation/view/program_view.dart';
 import 'package:geti_app/features/program/presentation/view_model/program_detail_view_model.dart';
@@ -14,7 +16,7 @@ import 'package:go_router/go_router.dart';
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  testWidgets('프로그램 목록 카드에서 해당 프로그램 상세로 이동한다', (tester) async {
+  testWidgets('프로그램 목록 카드에서 API programId 상세 Route로 이동한다', (tester) async {
     final router = _router();
     addTearDown(router.dispose);
     await _pumpRouter(tester, router);
@@ -22,12 +24,10 @@ void main() {
     await tester.tap(find.byType(ProgramCard).first);
     await tester.pumpAndSettle();
 
-    expect(router.state.pathParameters['programId'], 'applied');
-    expect(find.text('현직자와 함께하는 프론트엔드 특강'), findsOneWidget);
-    expect(find.text('신청 취소'), findsOneWidget);
+    expect(router.state.pathParameters['programId'], '1');
   });
 
-  testWidgets('취소됨과 삭제됨 Mock 프로그램도 기존 상세 Route를 사용한다', (tester) async {
+  testWidgets('프로그램 목록의 다음 카드도 API programId를 보존한다', (tester) async {
     final router = _router();
     addTearDown(router.dispose);
     await _pumpRouter(tester, router);
@@ -35,28 +35,13 @@ void main() {
     await tester.tap(find.byType(ProgramCard).at(1));
     await tester.pumpAndSettle();
 
-    expect(router.state.uri.path, '/programs/cancelled');
-    expect(find.text('프로그램 취소'), findsOneWidget);
-
-    await tester.tap(find.byKey(const ValueKey('program-detail-back')));
-    await tester.pumpAndSettle();
-
-    final deletedProgram = find.text('삭제된 프로그램입니다.');
-    await tester.ensureVisible(deletedProgram);
-    await tester.pumpAndSettle();
-    await tester.tap(deletedProgram);
-    await tester.pumpAndSettle();
-
-    expect(router.state.uri.path, '/programs/deleted');
-    expect(find.text('삭제된 프로그램입니다.'), findsOneWidget);
+    expect(router.state.pathParameters['programId'], '2');
   });
 
   testWidgets('프로그램 상세 Back은 기존 프로그램 목록으로 돌아간다', (tester) async {
-    final router = _router();
+    final router = _detailRouter();
     addTearDown(router.dispose);
-    await _pumpRouter(tester, router);
-    await tester.tap(find.byType(ProgramCard).first);
-    await tester.pumpAndSettle();
+    await _pumpDetailRouter(tester, router);
 
     await tester.tap(find.byKey(const ValueKey('program-detail-back')));
     await tester.pumpAndSettle();
@@ -539,6 +524,11 @@ Future<void> _pumpRouter(WidgetTester tester, GoRouter router) async {
   await _setViewport(tester);
   await tester.pumpWidget(
     ProviderScope(
+      overrides: [
+        programRepositoryProvider.overrideWithValue(
+          const _DetailTestProgramRepository(),
+        ),
+      ],
       child: ScreenUtilInit(
         designSize: const Size(390, 844),
         child: MaterialApp.router(routerConfig: router),
@@ -595,3 +585,50 @@ Future<void> _setViewport(WidgetTester tester) async {
   addTearDown(tester.view.resetPhysicalSize);
   addTearDown(tester.view.resetDevicePixelRatio);
 }
+
+class _DetailTestProgramRepository implements ProgramRepository {
+  const _DetailTestProgramRepository();
+
+  @override
+  Future<ProgramListResponse> getPrograms({
+    String? programType,
+    String? status,
+    bool? openOnly,
+    int page = 0,
+    int size = 20,
+    List<String>? sort,
+  }) async {
+    return ProgramListResponse(
+      content: _detailTestPrograms,
+      page: page,
+      size: size,
+      totalElements: _detailTestPrograms.length,
+      totalPages: 1,
+      first: true,
+      last: true,
+    );
+  }
+}
+
+final _detailTestPrograms = [
+  ProgramSummaryResponse(
+    programId: 1,
+    title: '목록 API 프로그램',
+    programType: 'SPECIAL_LECTURE',
+    status: 'PUBLISHED',
+    location: '세미나실',
+    startAt: DateTime(2026, 8, 12, 14),
+    endAt: DateTime(2026, 8, 12, 16),
+    applicationStartAt: DateTime(2026, 7, 20),
+    applicationEndAt: DateTime(2026, 8, 10),
+    currentApplicants: 1,
+    applied: true,
+  ),
+  ProgramSummaryResponse(
+    programId: 2,
+    title: '두 번째 API 프로그램',
+    programType: 'EDUCATION',
+    status: 'CLOSED',
+    currentApplicants: 0,
+  ),
+];
