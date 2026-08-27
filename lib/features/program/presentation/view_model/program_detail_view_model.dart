@@ -1,8 +1,20 @@
+import 'dart:async';
+
+import 'package:geti_app/features/program/data/dto/program_detail_response.dart';
+import 'package:geti_app/features/program/data/program_repository.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import 'program_type.dart';
 
 part 'program_detail_view_model.g.dart';
+
+enum ProgramDetailScreenStatus {
+  loaded,
+  loading,
+  notFound,
+  deleted,
+  networkError,
+}
 
 enum ProgramDetailActionStatus {
   available,
@@ -41,22 +53,58 @@ class ProgramDetail {
     required this.type,
     this.operationalStatus = ProgramOperationalStatus.active,
     this.recruitmentBadge = '모집 중',
-    this.applicationPeriod = '신청 08.01–08.10',
-    this.viewCount = '조회수 128',
-    this.schedule = '2026.08.12 14:00–16:00',
-    this.location = '광주소프트웨어마이스터고 시청각실',
-    this.capacity = '30명',
-    this.description = '현직 프론트엔드 개발자가 실무 경험과 취업 준비 방법을 공유합니다.',
-    this.recruitmentCapacity = '50명',
-    this.currentApplicants = '32명',
-    this.remainingCapacity = '18명',
-    this.admissionType = '선착순',
+    this.applicationPeriod = '신청 08.01-08.10',
+    this.viewCount = '조회수 -',
+    this.schedule = '일정 미정',
+    this.location = '장소 미정',
+    this.capacity = '정원 미정',
+    this.description = '',
+    this.recruitmentCapacity = '정원 미정',
+    this.currentApplicants = '0명',
+    this.remainingCapacity = '남은 인원 미정',
+    this.admissionType = '선착순 아님',
     this.cancellationDate = '2026.08.08 (금) 15:20',
     this.cancellationReason = '사용자 취소',
-    this.applicationSubmittedAt = '2026.08.01 14:32',
-    this.programStatusChangedAt = '2026.08.05 10:30',
-    this.programCancellationReason = '강사 사정으로 인해 프로그램이 취소되었습니다.',
+    this.applicationSubmittedAt = '확인 불가',
+    this.programStatusChangedAt = '확인 불가',
+    this.programCancellationReason = '운영 사정으로 프로그램이 취소되었습니다.',
   });
+
+  factory ProgramDetail.fromResponse(ProgramDetailResponse response) {
+    return ProgramDetail(
+      id: response.programId.toString(),
+      title: response.title,
+      actionStatus: programDetailActionStatusFrom(response),
+      operationalStatus: response.status == 'DELETED'
+          ? ProgramOperationalStatus.deleted
+          : ProgramOperationalStatus.active,
+      type: _programTypeFrom(response.programType),
+      recruitmentBadge: _recruitmentBadgeFrom(response.status),
+      applicationPeriod: _applicationPeriodLabel(
+        response.applicationStartAt,
+        response.applicationEndAt,
+      ),
+      schedule: _dateTimeRangeLabel(response.startAt, response.endAt),
+      location: _textOrFallback(response.location, '장소 미정'),
+      capacity: _countLabel(response.capacity, '정원 미정'),
+      description: _textOrFallback(response.content, '프로그램 설명이 없습니다.'),
+      recruitmentCapacity: _countLabel(response.capacity, '정원 미정'),
+      currentApplicants: '${response.currentApplicants}명',
+      remainingCapacity: _countLabel(response.remainingCapacity, '남은 인원 미정'),
+      admissionType: response.firstComeServed ? '선착순' : '선착순 아님',
+    );
+  }
+
+  factory ProgramDetail.deletedFallback(String programId) {
+    return ProgramDetail(
+      id: programId,
+      title: '삭제된 프로그램입니다.',
+      actionStatus: ProgramDetailActionStatus.applied,
+      operationalStatus: ProgramOperationalStatus.deleted,
+      type: ProgramType.specialLecture,
+      recruitmentBadge: '삭제됨',
+    );
+  }
 
   final String id;
   final String title;
@@ -112,19 +160,93 @@ class ProgramDetail {
 }
 
 class ProgramDetailViewState {
-  const ProgramDetailViewState({this.detail});
+  const ProgramDetailViewState({
+    this.screenStatus = ProgramDetailScreenStatus.loaded,
+    this.detail,
+  });
+
+  final ProgramDetailScreenStatus screenStatus;
   final ProgramDetail? detail;
 
-  ProgramDetailViewState copyWith({ProgramDetail? detail}) {
-    return ProgramDetailViewState(detail: detail ?? this.detail);
+  ProgramDetailViewState copyWith({
+    ProgramDetailScreenStatus? screenStatus,
+    ProgramDetail? detail,
+    bool clearDetail = false,
+  }) {
+    return ProgramDetailViewState(
+      screenStatus: screenStatus ?? this.screenStatus,
+      detail: clearDetail ? null : (detail ?? this.detail),
+    );
   }
 }
 
 @riverpod
 class ProgramDetailViewModel extends _$ProgramDetailViewModel {
+  int _detailRequestVersion = 0;
+
   @override
   ProgramDetailViewState build(String programId) {
-    return ProgramDetailViewState(detail: mockProgramDetails[programId]);
+    unawaited(Future.microtask(_fetchProgramDetail));
+    return const ProgramDetailViewState(
+      screenStatus: ProgramDetailScreenStatus.loading,
+    );
+  }
+
+  Future<void> retry() => _fetchProgramDetail();
+
+  Future<void> _fetchProgramDetail() async {
+    final requestVersion = ++_detailRequestVersion;
+    final id = int.tryParse(programId);
+    if (id == null) {
+      state = const ProgramDetailViewState(
+        screenStatus: ProgramDetailScreenStatus.notFound,
+      );
+      return;
+    }
+
+    state = state.copyWith(
+      screenStatus: ProgramDetailScreenStatus.loading,
+      clearDetail: true,
+    );
+
+    try {
+      final response = await ref
+          .read(programRepositoryProvider)
+          .getProgramDetail(id);
+      if (!ref.mounted || requestVersion != _detailRequestVersion) return;
+
+      final detail = ProgramDetail.fromResponse(response);
+      state = ProgramDetailViewState(
+        screenStatus:
+            detail.operationalStatus == ProgramOperationalStatus.deleted
+            ? ProgramDetailScreenStatus.deleted
+            : ProgramDetailScreenStatus.loaded,
+        detail: detail,
+      );
+    } on ProgramRepositoryException catch (error) {
+      if (!ref.mounted || requestVersion != _detailRequestVersion) return;
+      if (error.statusCode == 404 || error.code == 'PROGRAM_NOT_FOUND') {
+        state = const ProgramDetailViewState(
+          screenStatus: ProgramDetailScreenStatus.notFound,
+        );
+        return;
+      }
+      if (error.statusCode == 410 || error.code == 'PROGRAM_DELETED') {
+        state = ProgramDetailViewState(
+          screenStatus: ProgramDetailScreenStatus.deleted,
+          detail: ProgramDetail.deletedFallback(programId),
+        );
+        return;
+      }
+      state = const ProgramDetailViewState(
+        screenStatus: ProgramDetailScreenStatus.networkError,
+      );
+    } catch (_) {
+      if (!ref.mounted || requestVersion != _detailRequestVersion) return;
+      state = const ProgramDetailViewState(
+        screenStatus: ProgramDetailScreenStatus.networkError,
+      );
+    }
   }
 
   Future<void> applyProgram() async {
@@ -133,6 +255,7 @@ class ProgramDetailViewModel extends _$ProgramDetailViewModel {
         detail.actionStatus != ProgramDetailActionStatus.available) {
       return;
     }
+    _detailRequestVersion++;
 
     state = state.copyWith(
       detail: detail.copyWith(actionStatus: ProgramDetailActionStatus.applying),
@@ -172,6 +295,7 @@ class ProgramDetailViewModel extends _$ProgramDetailViewModel {
             detail.actionStatus != ProgramDetailActionStatus.cancelFailure)) {
       return;
     }
+    _detailRequestVersion++;
 
     state = state.copyWith(
       detail: detail.copyWith(
@@ -206,54 +330,103 @@ class ProgramDetailViewModel extends _$ProgramDetailViewModel {
       return;
     }
     state = state.copyWith(
+      screenStatus: ProgramDetailScreenStatus.loaded,
       detail: detail!.copyWith(actionStatus: ProgramDetailActionStatus.applied),
     );
   }
 }
 
-const mockProgramDetails = <String, ProgramDetail>{
-  'available': ProgramDetail(
-    id: 'available',
-    title: '현직자와 함께하는 프론트엔드 특강',
-    actionStatus: ProgramDetailActionStatus.available,
-    type: ProgramType.specialLecture,
-  ),
-  'upcoming': ProgramDetail(
-    id: 'upcoming',
-    title: '포트폴리오 1:1 멘토링',
-    actionStatus: ProgramDetailActionStatus.upcoming,
-    type: ProgramType.education,
-  ),
-  'full': ProgramDetail(
-    id: 'full',
-    title: '2026 하반기 취업 전략 설명회',
-    actionStatus: ProgramDetailActionStatus.full,
-    type: ProgramType.education,
-  ),
-  'closed': ProgramDetail(
-    id: 'closed',
-    title: '포트폴리오 1:1 멘토링',
-    actionStatus: ProgramDetailActionStatus.closed,
-    type: ProgramType.education,
-  ),
-  'applied': ProgramDetail(
-    id: 'applied',
-    title: '현직자와 함께하는 프론트엔드 특강',
-    actionStatus: ProgramDetailActionStatus.applied,
-    type: ProgramType.specialLecture,
-  ),
-  'cancelled': ProgramDetail(
-    id: 'cancelled',
-    title: '현직자와 함께하는 프론트엔드 특강',
-    actionStatus: ProgramDetailActionStatus.applied,
-    type: ProgramType.specialLecture,
-    operationalStatus: ProgramOperationalStatus.cancelled,
-  ),
-  'deleted': ProgramDetail(
-    id: 'deleted',
-    title: '삭제된 프로그램입니다.',
-    actionStatus: ProgramDetailActionStatus.applied,
-    type: ProgramType.specialLecture,
-    operationalStatus: ProgramOperationalStatus.deleted,
-  ),
+ProgramDetailActionStatus programDetailActionStatusFrom(
+  ProgramDetailResponse response,
+) {
+  if (response.status == 'DELETED') {
+    return ProgramDetailActionStatus.applied;
+  }
+  if (_hasAction(response, 'CANCEL') ||
+      response.eligibilityReason == 'ALREADY_APPLIED') {
+    return ProgramDetailActionStatus.applied;
+  }
+  if (response.canApply || _hasAction(response, 'APPLY')) {
+    return ProgramDetailActionStatus.available;
+  }
+
+  return switch (response.eligibilityReason) {
+    'PROGRAM_NOT_OPEN' ||
+    'PROGRAM_NOT_PUBLISHED' => ProgramDetailActionStatus.upcoming,
+    'PROGRAM_FULL' => ProgramDetailActionStatus.full,
+    'PROGRAM_CLOSED' => ProgramDetailActionStatus.closed,
+    _ => switch (response.status) {
+      'DRAFT' => ProgramDetailActionStatus.upcoming,
+      'CLOSED' => ProgramDetailActionStatus.closed,
+      _ => ProgramDetailActionStatus.closed,
+    },
+  };
+}
+
+bool _hasAction(ProgramDetailResponse response, String action) {
+  return response.availableActions.any(
+    (value) => value.toUpperCase() == action,
+  );
+}
+
+String _recruitmentBadgeFrom(String status) {
+  return switch (status) {
+    'DRAFT' => '모집 예정',
+    'PUBLISHED' => '모집 중',
+    'CLOSED' => '모집 종료',
+    'DELETED' => '삭제됨',
+    _ => '모집 상태 미정',
+  };
+}
+
+String _textOrFallback(String? value, String fallback) {
+  final trimmed = value?.trim();
+  return trimmed == null || trimmed.isEmpty ? fallback : trimmed;
+}
+
+String _countLabel(int? value, String fallback) {
+  return value == null ? fallback : '$value명';
+}
+
+ProgramType _programTypeFrom(String raw) => switch (raw) {
+  'EDUCATION' => ProgramType.education,
+  _ => ProgramType.specialLecture,
 };
+
+String _dateTimeRangeLabel(DateTime? start, DateTime? end) {
+  if (start == null && end == null) return '일정 미정';
+  if (start == null) return '${_fullDateLabel(end!)} ${_timeLabel(end)}';
+  if (end == null) return '${_fullDateLabel(start)} ${_timeLabel(start)}';
+  if (_isSameDate(start, end)) {
+    return '${_fullDateLabel(start)} ${_timeLabel(start)}-${_timeLabel(end)}';
+  }
+  return '${_fullDateLabel(start)} ${_timeLabel(start)} - '
+      '${_fullDateLabel(end)} ${_timeLabel(end)}';
+}
+
+String _applicationPeriodLabel(DateTime? start, DateTime? end) {
+  if (start == null && end == null) return '신청 기간 미정';
+  if (start == null) return '신청 ${_shortDateLabel(end!)}';
+  if (end == null) return '신청 ${_shortDateLabel(start)}';
+  return '신청 ${_shortDateLabel(start)}-${_shortDateLabel(end)}';
+}
+
+String _shortDateLabel(DateTime value) {
+  return '${value.month.toString().padLeft(2, '0')}.'
+      '${value.day.toString().padLeft(2, '0')}';
+}
+
+String _fullDateLabel(DateTime value) {
+  return '${value.year}.'
+      '${value.month.toString().padLeft(2, '0')}.'
+      '${value.day.toString().padLeft(2, '0')}';
+}
+
+String _timeLabel(DateTime value) {
+  return '${value.hour.toString().padLeft(2, '0')}:'
+      '${value.minute.toString().padLeft(2, '0')}';
+}
+
+bool _isSameDate(DateTime a, DateTime b) {
+  return a.year == b.year && a.month == b.month && a.day == b.day;
+}

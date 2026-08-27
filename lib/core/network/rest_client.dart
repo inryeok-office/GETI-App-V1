@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:geti_app/core/config/app_config.dart';
 import 'package:geti_app/core/network/dio_provider.dart';
+import 'package:geti_app/features/program/data/dto/program_detail_response.dart';
 import 'package:geti_app/features/program/data/dto/program_list_response.dart';
 import 'package:retrofit/retrofit.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
@@ -20,6 +21,11 @@ abstract class RestClient {
     @Query('size') int size = 20,
     @Query('sort') List<String>? sort,
   });
+
+  @GET('/api/v1/programs/{programId}')
+  Future<ApiResponseProgramDetailResponse> getProgram(
+    @Path('programId') int programId,
+  );
 }
 
 @Riverpod(keepAlive: true)

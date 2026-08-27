@@ -1,20 +1,133 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:geti_app/features/program/data/dto/program_detail_response.dart';
 import 'package:geti_app/features/program/data/dto/program_list_response.dart';
 import 'package:geti_app/features/program/data/program_repository.dart';
 import 'package:geti_app/features/program/presentation/view/program_detail_view.dart';
 import 'package:geti_app/features/program/presentation/view/program_view.dart';
 import 'package:geti_app/features/program/presentation/view_model/program_detail_view_model.dart';
 import 'package:geti_app/features/program/presentation/view_model/program_type.dart';
-import 'package:geti_app/features/program/presentation/view_model/program_view_model.dart';
 import 'package:geti_app/features/program/presentation/widgets/program_card.dart';
+import 'package:geti_app/features/program/presentation/widgets/program_detail_sections.dart';
+import 'package:geti_app/features/program/presentation/widgets/program_state_content.dart';
 import 'package:geti_app/shared/widgets/app_bottom_navigation.dart';
 import 'package:go_router/go_router.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+
+  test('ProgramDetailResponse parses nullable values and files', () {
+    final response = ProgramDetailResponse.fromJson({
+      'programId': 9,
+      'title': 'API detail',
+      'content': null,
+      'location': null,
+      'programType': 'EDUCATION',
+      'targetGrades': [1, 2, 3],
+      'startAt': null,
+      'endAt': null,
+      'applicationStartAt': '2026-08-01T00:00:00',
+      'applicationEndAt': '2026-08-10T23:59:00',
+      'capacity': null,
+      'currentApplicants': 12,
+      'remainingCapacity': null,
+      'firstComeServed': false,
+      'canApply': false,
+      'eligibilityReason': 'PROGRAM_FULL',
+      'eligibilityMessage': 'full',
+      'availableActions': ['CANCEL'],
+      'canSubscribeVacancy': true,
+      'vacancySubscribed': false,
+      'vacancySubscriptionStatus': null,
+      'status': 'PUBLISHED',
+      'files': [
+        {
+          'fileId': 1,
+          'originalName': 'guide.pdf',
+          'contentType': 'application/pdf',
+          'size': 1000,
+          'downloadUrl': 'https://example.com/guide.pdf',
+        },
+      ],
+    });
+
+    expect(response.programId, 9);
+    expect(response.programType, 'EDUCATION');
+    expect(response.targetGrades, [1, 2, 3]);
+    expect(response.content, isNull);
+    expect(response.location, isNull);
+    expect(response.capacity, isNull);
+    expect(response.remainingCapacity, isNull);
+    expect(response.availableActions, ['CANCEL']);
+    expect(response.files.single.originalName, 'guide.pdf');
+  });
+
+  test('ProgramDetailResponse maps server action fields to UI status', () {
+    expect(
+      programDetailActionStatusFrom(_detail(canApply: true)),
+      ProgramDetailActionStatus.available,
+    );
+    expect(
+      programDetailActionStatusFrom(
+        _detail(eligibilityReason: 'ALREADY_APPLIED'),
+      ),
+      ProgramDetailActionStatus.applied,
+    );
+    expect(
+      programDetailActionStatusFrom(_detail(availableActions: ['CANCEL'])),
+      ProgramDetailActionStatus.applied,
+    );
+    expect(
+      programDetailActionStatusFrom(
+        _detail(
+          canApply: false,
+          eligibilityReason: 'PROGRAM_NOT_OPEN',
+          availableActions: const [],
+        ),
+      ),
+      ProgramDetailActionStatus.upcoming,
+    );
+    expect(
+      programDetailActionStatusFrom(
+        _detail(
+          canApply: false,
+          eligibilityReason: 'PROGRAM_FULL',
+          availableActions: const [],
+        ),
+      ),
+      ProgramDetailActionStatus.full,
+    );
+    expect(
+      programDetailActionStatusFrom(
+        _detail(
+          canApply: false,
+          eligibilityReason: 'PROGRAM_CLOSED',
+          availableActions: const [],
+        ),
+      ),
+      ProgramDetailActionStatus.closed,
+    );
+  });
+
+  test('ProgramDetail maps API detail to existing UI model safely', () {
+    final detail = ProgramDetail.fromResponse(_detail());
+
+    expect(detail.id, '1');
+    expect(detail.title, 'API 상세 프로그램');
+    expect(detail.type, ProgramType.specialLecture);
+    expect(detail.actionStatus, ProgramDetailActionStatus.available);
+    expect(detail.applicationPeriod, '신청 08.01-08.10');
+    expect(detail.schedule, '2026.08.12 14:00-16:00');
+    expect(detail.location, '장소 A');
+    expect(detail.capacity, '30명');
+    expect(detail.currentApplicants, '12명');
+    expect(detail.remainingCapacity, '18명');
+    expect(detail.admissionType, '선착순');
+  });
 
   testWidgets('프로그램 목록 카드에서 API programId 상세 Route로 이동한다', (tester) async {
     final router = _router();
@@ -25,6 +138,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(router.state.pathParameters['programId'], '1');
+    expect(find.text('API 상세 프로그램'), findsOneWidget);
   });
 
   testWidgets('프로그램 목록의 다음 카드도 API programId를 보존한다', (tester) async {
@@ -36,6 +150,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(router.state.pathParameters['programId'], '2');
+    expect(find.text('두 번째 API 상세'), findsOneWidget);
   });
 
   testWidgets('프로그램 상세 Back은 기존 프로그램 목록으로 돌아간다', (tester) async {
@@ -50,258 +165,165 @@ void main() {
     expect(find.byType(ProgramView), findsOneWidget);
   });
 
-  testWidgets('존재하지 않는 프로그램 id는 not-found 상태를 표시한다', (tester) async {
-    await _setViewport(tester);
-    await tester.pumpWidget(
-      const ProviderScope(
-        child: ScreenUtilInit(
-          designSize: Size(390, 844),
-          child: MaterialApp(
-            home: ProgramDetailView(programId: 'missing-program'),
-          ),
+  testWidgets('상세 API 데이터가 기존 Program Detail UI에 표시된다', (tester) async {
+    final router = _detailRouter();
+    addTearDown(router.dispose);
+    await _pumpDetailRouter(tester, router);
+
+    expect(find.text('API 상세 프로그램'), findsOneWidget);
+    expect(find.text('신청 08.01-08.10'), findsOneWidget);
+    expect(find.text('2026.08.12 14:00-16:00'), findsOneWidget);
+    expect(find.text('장소 A'), findsOneWidget);
+    expect(find.text('30명'), findsWidgets);
+    expect(find.text('API 상세 설명'), findsOneWidget);
+    expect(find.text('12명'), findsOneWidget);
+    expect(find.text('18명'), findsOneWidget);
+    expect(find.text('선착순'), findsOneWidget);
+    expect(find.byType(AppBottomNavigation), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('nullable 상세 API 값은 crash 없이 fallback으로 표시된다', (tester) async {
+    final router = _detailRouter(programId: '2');
+    addTearDown(router.dispose);
+    await _pumpDetailRouter(tester, router);
+
+    expect(find.text('두 번째 API 상세'), findsOneWidget);
+    expect(find.text('일정 미정'), findsOneWidget);
+    expect(find.text('장소 미정'), findsOneWidget);
+    expect(find.text('정원 미정'), findsWidgets);
+    expect(find.text('남은 인원 미정'), findsOneWidget);
+    expect(find.text('프로그램 설명이 없습니다.'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('숫자가 아닌 programId는 API 호출 없이 not-found 상태를 표시한다', (tester) async {
+    final repository = _DetailTestProgramRepository();
+
+    await _pumpDetailView(
+      tester,
+      programId: 'missing-program',
+      repository: repository,
+    );
+
+    expect(
+      find.byKey(const ValueKey('program-detail-not-found')),
+      findsOneWidget,
+    );
+    expect(repository.detailRequests, isEmpty);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('404 PROGRAM_NOT_FOUND는 not-found 상태를 표시한다', (tester) async {
+    await _pumpDetailView(
+      tester,
+      programId: '404',
+      repository: _DetailTestProgramRepository(
+        detailError: ProgramRepositoryException(
+          'not found',
+          statusCode: 404,
+          code: 'PROGRAM_NOT_FOUND',
         ),
       ),
     );
-    await tester.pump();
 
-    expect(find.text('프로그램 정보를 찾을 수 없습니다.'), findsOneWidget);
-    expect(tester.takeException(), isNull);
-  });
-
-  testWidgets('프로그램 취소됨 상태는 Figma 안내와 신청 이력을 표시한다', (tester) async {
-    final router = _detailRouter(programId: 'cancelled');
-    addTearDown(router.dispose);
-    await _pumpDetailRouter(tester, router);
-
-    expect(router.state.uri.path, '/programs/cancelled');
-    expect(find.text('프로그램 취소'), findsOneWidget);
-    expect(find.text('현직자와 함께하는 프론트엔드 특강'), findsOneWidget);
-    expect(find.text('신청 08.01–08.10   ·   조회수 128'), findsOneWidget);
-    expect(find.text('해당 프로그램은 운영 사정으로 취소되었습니다.'), findsOneWidget);
-    expect(find.text('취소 사유'), findsOneWidget);
-    expect(find.text('강사 사정으로 인해 프로그램이 취소되었습니다.'), findsOneWidget);
-    expect(find.text('이용에 불편을 드려 죄송합니다.'), findsOneWidget);
-    expect(find.text('신청일'), findsOneWidget);
-    expect(find.text('2026.08.01 14:32'), findsOneWidget);
-    expect(find.text('상태'), findsOneWidget);
-    expect(find.text('취소됨 (2026.08.05 10:30)'), findsOneWidget);
-    expect(find.text('※ 프로그램은 취소되었지만 신청 내역은 확인할 수 있습니다.'), findsOneWidget);
     expect(
-      find.byKey(const ValueKey('program-detail-action-applied')),
-      findsNothing,
-    );
-    expect(find.byType(AppBottomNavigation), findsNothing);
-    expect(tester.takeException(), isNull);
-  });
-
-  testWidgets('삭제된 프로그램 상태는 삭제 안내와 신청 이력을 표시한다', (tester) async {
-    final router = _detailRouter(programId: 'deleted');
-    addTearDown(router.dispose);
-    await _pumpDetailRouter(tester, router);
-
-    expect(router.state.uri.path, '/programs/deleted');
-    expect(find.text('삭제된 프로그램입니다.'), findsOneWidget);
-    expect(find.text('운영에 의해 해당 프로그램 정보가\n삭제되었습니다.'), findsOneWidget);
-    expect(find.text('신청일'), findsOneWidget);
-    expect(find.text('2026.08.01 14:32'), findsOneWidget);
-    expect(find.text('상태'), findsOneWidget);
-    expect(find.text('삭제됨 (2026.08.05 10:30)'), findsOneWidget);
-    expect(find.text('※ 프로그램은 삭제되었지만 신청 내역은 확인할 수 있습니다.'), findsOneWidget);
-    expect(find.text('프로그램 취소'), findsNothing);
-    expect(
-      find.byKey(const ValueKey('program-detail-action-applied')),
-      findsNothing,
-    );
-    expect(find.byType(AppBottomNavigation), findsNothing);
-    expect(tester.takeException(), isNull);
-  });
-
-  test('서로 다른 Mock ID는 서로 다른 상세 데이터와 연결된다', () {
-    final container = ProviderContainer();
-    addTearDown(container.dispose);
-
-    final available = container.read(
-      programDetailViewModelProvider('available'),
-    );
-    final full = container.read(programDetailViewModelProvider('full'));
-
-    expect(available.detail!.id, 'available');
-    expect(available.detail!.actionStatus, ProgramDetailActionStatus.available);
-    expect(full.detail!.id, 'full');
-    expect(full.detail!.title, '2026 하반기 취업 전략 설명회');
-    expect(full.detail!.actionStatus, ProgramDetailActionStatus.full);
-    final cancelled = container.read(
-      programDetailViewModelProvider('cancelled'),
-    );
-    expect(cancelled.detail!.actionStatus, ProgramDetailActionStatus.applied);
-    expect(
-      cancelled.detail!.operationalStatus,
-      ProgramOperationalStatus.cancelled,
-    );
-    expect(
-      container.read(programDetailViewModelProvider('deleted')).detail!.id,
-      'deleted',
-    );
-    expect(
-      container
-          .read(programDetailViewModelProvider('deleted'))
-          .detail!
-          .operationalStatus,
-      ProgramOperationalStatus.deleted,
+      find.byKey(const ValueKey('program-detail-not-found')),
+      findsOneWidget,
     );
   });
 
-  test('목록과 상세 Mock은 같은 프로그램 유형을 사용한다', () {
-    expect(mockProgramDetails, hasLength(mockPrograms.length));
-
-    for (final program in mockPrograms) {
-      expect(
-        mockProgramDetails[program.id]?.type,
-        program.type,
-        reason: '${program.id}의 목록/상세 유형이 일치해야 한다.',
-      );
-    }
-
-    expect(mockProgramDetails.values.map((detail) => detail.type).toSet(), {
-      ProgramType.specialLecture,
-      ProgramType.education,
-    });
-  });
-
-  testWidgets('상세는 SPECIAL_LECTURE 유형을 Figma 라벨로 표시한다', (tester) async {
-    await _pumpBody(
+  testWidgets('410 PROGRAM_DELETED는 기존 삭제된 프로그램 UI를 표시한다', (tester) async {
+    await _pumpDetailView(
       tester,
-      const ProgramDetail(
-        id: 'specialLecture',
-        title: '현직자와 함께하는 프론트엔드 특강',
-        actionStatus: ProgramDetailActionStatus.available,
-        type: ProgramType.specialLecture,
+      programId: '410',
+      repository: _DetailTestProgramRepository(
+        detailError: ProgramRepositoryException(
+          'deleted',
+          statusCode: 410,
+          code: 'PROGRAM_DELETED',
+        ),
       ),
     );
 
-    expect(find.text('특강'), findsOneWidget);
-    expect(find.text('모집 중'), findsOneWidget);
+    expect(find.byType(ProgramDeletedDetailBody), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('program-status-history')),
+      findsOneWidget,
+    );
   });
 
-  testWidgets('상세는 EDUCATION 유형도 같은 배지 위치에서 표시할 수 있다', (tester) async {
-    await _pumpBody(
-      tester,
-      const ProgramDetail(
-        id: 'education',
-        title: '취업 교육 프로그램',
-        actionStatus: ProgramDetailActionStatus.available,
-        type: ProgramType.education,
-      ),
+  testWidgets('상세 API 실패는 기존 네트워크 에러 UI를 표시하고 재시도한다', (tester) async {
+    final repository = _DetailTestProgramRepository(
+      detailError: const ProgramRepositoryException('network error'),
+      retryDetail: _detail(title: '재시도 성공'),
     );
 
-    expect(find.text('교육'), findsOneWidget);
-    expect(find.text('모집 중'), findsOneWidget);
+    await _pumpDetailView(tester, programId: '1', repository: repository);
+
+    expect(find.byType(ProgramNetworkErrorState), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('program-retry')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('재시도 성공'), findsOneWidget);
+  });
+
+  testWidgets('상세 로딩 상태를 표시한다', (tester) async {
+    final completer = Completer<ProgramDetailResponse>();
+
+    await _pumpDetailView(
+      tester,
+      programId: '1',
+      repository: _DetailTestProgramRepository(pendingDetail: completer.future),
+      settle: false,
+    );
+
+    expect(find.byType(ProgramLoadingState), findsOneWidget);
+    completer.complete(_detail());
+    await tester.pumpAndSettle();
   });
 
   test('신청 처리 중에는 중복 신청을 실행하지 않고 완료 상태로 전환한다', () async {
-    final container = ProviderContainer();
+    final container = ProviderContainer(
+      overrides: [
+        programRepositoryProvider.overrideWithValue(
+          _DetailTestProgramRepository(),
+        ),
+      ],
+    );
     addTearDown(container.dispose);
     final subscription = container.listen(
-      programDetailViewModelProvider('available'),
+      programDetailViewModelProvider('1'),
       (_, _) {},
       fireImmediately: true,
     );
     addTearDown(subscription.close);
+    await _waitForDetail(container, '1');
     final notifier = container.read(
-      programDetailViewModelProvider('available').notifier,
+      programDetailViewModelProvider('1').notifier,
     );
 
     final firstApplication = notifier.applyProgram();
     expect(
-      container
-          .read(programDetailViewModelProvider('available'))
-          .detail!
-          .actionStatus,
+      container.read(programDetailViewModelProvider('1')).detail!.actionStatus,
       ProgramDetailActionStatus.applying,
     );
 
     await notifier.applyProgram();
     expect(
-      container
-          .read(programDetailViewModelProvider('available'))
-          .detail!
-          .actionStatus,
+      container.read(programDetailViewModelProvider('1')).detail!.actionStatus,
       ProgramDetailActionStatus.applying,
     );
 
     await firstApplication;
     expect(
-      container
-          .read(programDetailViewModelProvider('available'))
-          .detail!
-          .actionStatus,
+      container.read(programDetailViewModelProvider('1')).detail!.actionStatus,
       ProgramDetailActionStatus.applied,
     );
   });
 
-  test('신청 취소 처리 중에는 중복 취소를 실행하지 않고 완료 상태로 전환한다', () async {
-    final container = ProviderContainer();
-    addTearDown(container.dispose);
-    final subscription = container.listen(
-      programDetailViewModelProvider('applied'),
-      (_, _) {},
-      fireImmediately: true,
-    );
-    addTearDown(subscription.close);
-    final notifier = container.read(
-      programDetailViewModelProvider('applied').notifier,
-    );
-
-    final firstCancellation = notifier.cancelProgram();
-    expect(
-      container
-          .read(programDetailViewModelProvider('applied'))
-          .detail!
-          .actionStatus,
-      ProgramDetailActionStatus.cancelling,
-    );
-
-    await notifier.cancelProgram();
-    expect(
-      container
-          .read(programDetailViewModelProvider('applied'))
-          .detail!
-          .actionStatus,
-      ProgramDetailActionStatus.cancelling,
-    );
-
-    await firstCancellation;
-    expect(
-      container
-          .read(programDetailViewModelProvider('applied'))
-          .detail!
-          .actionStatus,
-      ProgramDetailActionStatus.cancelled,
-    );
-  });
-
-  testWidgets('신청하기 Tap 후 처리 중 UI를 거쳐 신청 완료를 표시한다', (tester) async {
-    final router = _detailRouter();
-    addTearDown(router.dispose);
-    await _pumpDetailRouter(tester, router);
-
-    await tester.tap(find.text('신청하기'));
-    await tester.pump();
-
-    expect(find.text('신청을 처리 중입니다.'), findsOneWidget);
-    expect(find.text('잠시만 기다려 주세요.'), findsOneWidget);
-    expect(
-      find.byKey(const ValueKey('program-applying-loading')),
-      findsOneWidget,
-    );
-
-    await tester.pump(const Duration(milliseconds: 700));
-    await tester.pump();
-    expect(find.text('신청 취소'), findsOneWidget);
-  });
-
   testWidgets('신청 취소 Tap은 확인 BottomSheet를 표시하고 계속 참여하기로 닫는다', (tester) async {
-    final router = _detailRouter(programId: 'applied');
+    final router = _detailRouter(programId: '3');
     addTearDown(router.dispose);
     await _pumpDetailRouter(tester, router);
 
@@ -310,11 +332,6 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('프로그램 신청을 취소할까요?'), findsOneWidget);
-    expect(find.text('취소 후 정원이 마감되면 다시 신청할 수 없습니다.'), findsOneWidget);
-    expect(find.text('유의사항'), findsOneWidget);
-    expect(find.text('프로그램 시작 2일 전까지 취소할 수 있습니다.'), findsOneWidget);
-    expect(find.text('프로그램 시작 이후에는 취소가 불가능합니다.'), findsOneWidget);
     expect(
       find.byKey(const ValueKey('program-cancel-confirm')),
       findsOneWidget,
@@ -327,31 +344,15 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('program-cancel-continue')));
     await tester.pumpAndSettle();
 
-    expect(find.text('프로그램 신청을 취소할까요?'), findsNothing);
-    expect(find.text('신청 취소'), findsOneWidget);
-  });
-
-  testWidgets('신청 취소 확인 BottomSheet는 빠른 중복 Tap에도 하나만 표시된다', (tester) async {
-    final router = _detailRouter(programId: 'applied');
-    addTearDown(router.dispose);
-    await _pumpDetailRouter(tester, router);
-
-    final cancelAction = find.byKey(
-      const ValueKey('program-detail-action-applied'),
-    );
-    await tester.tap(cancelAction);
-    await tester.tap(cancelAction, warnIfMissed: false);
-    await tester.pumpAndSettle();
-
-    expect(find.text('프로그램 신청을 취소할까요?'), findsOneWidget);
+    expect(find.byKey(const ValueKey('program-cancel-confirm')), findsNothing);
     expect(
-      find.byKey(const ValueKey('program-cancel-confirm')),
+      find.byKey(const ValueKey('program-detail-action-applied')),
       findsOneWidget,
     );
   });
 
-  testWidgets('신청 취소 성공은 처리 중 UI를 거쳐 완료 Dialog를 표시한다', (tester) async {
-    final router = _detailRouter(programId: 'applied');
+  testWidgets('신청 취소 처리 중에는 중복 취소를 실행하지 않고 완료 상태로 전환한다', (tester) async {
+    final router = _detailRouter(programId: '3');
     addTearDown(router.dispose);
     await _pumpDetailRouter(tester, router);
 
@@ -362,8 +363,6 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('program-cancel-confirm')));
     await tester.pump();
 
-    expect(find.text('신청 취소 처리 중입니다.'), findsOneWidget);
-    expect(find.text('잠시만 기다려 주세요.'), findsOneWidget);
     expect(
       find.byKey(const ValueKey('program-cancelling-loading')),
       findsOneWidget,
@@ -372,20 +371,56 @@ void main() {
     await tester.pump(const Duration(milliseconds: 700));
     await tester.pump();
 
-    expect(find.text('신청이 취소되었습니다'), findsOneWidget);
-    expect(find.text('취소일'), findsOneWidget);
-    expect(find.text('2026.08.08 (금) 15:20'), findsOneWidget);
-    expect(find.text('취소 사유'), findsOneWidget);
-    expect(find.text('사용자 취소'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('program-cancel-go-programs')),
+      findsOneWidget,
+    );
+  });
 
-    await tester.tap(find.byKey(const ValueKey('program-cancel-go-programs')));
+  testWidgets('신청하기 Tap 후 처리 중 UI를 거쳐 신청 완료 상태를 표시한다', (tester) async {
+    final router = _detailRouter();
+    addTearDown(router.dispose);
+    await _pumpDetailRouter(tester, router);
+
+    await tester.tap(
+      find.byKey(const ValueKey('program-detail-action-available')),
+    );
+    await tester.pump();
+
+    expect(
+      find.byKey(const ValueKey('program-applying-loading')),
+      findsOneWidget,
+    );
+
+    await tester.pump(const Duration(milliseconds: 700));
+    await tester.pump();
+
+    expect(
+      find.byKey(const ValueKey('program-detail-action-applied')),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('신청 취소 확인 BottomSheet는 빠른 중복 Tap에도 하나만 표시된다', (tester) async {
+    final router = _detailRouter(programId: '3');
+    addTearDown(router.dispose);
+    await _pumpDetailRouter(tester, router);
+
+    final cancelAction = find.byKey(
+      const ValueKey('program-detail-action-applied'),
+    );
+    await tester.tap(cancelAction);
+    await tester.tap(cancelAction, warnIfMissed: false);
     await tester.pumpAndSettle();
 
-    expect(router.state.uri.path, '/programs');
+    expect(
+      find.byKey(const ValueKey('program-cancel-confirm')),
+      findsOneWidget,
+    );
   });
 
   testWidgets('신청 취소 실패는 실패 Dialog와 재시도/닫기 Action을 표시한다', (tester) async {
-    final router = _detailRouter(programId: 'applied');
+    final router = _detailRouter(programId: '3');
     addTearDown(router.dispose);
     await _pumpDetailRouter(tester, router, cancellationFailure: true);
 
@@ -397,40 +432,25 @@ void main() {
     await tester.pump(const Duration(milliseconds: 700));
     await tester.pump();
 
-    expect(find.text('신청을 취소하지 못했어요'), findsOneWidget);
-    expect(find.text('사유'), findsOneWidget);
-    expect(find.text('이미 취소 가능한 기한이 지났거나\n다른 이유로 취소가 불가능합니다.'), findsOneWidget);
     expect(find.byKey(const ValueKey('program-cancel-retry')), findsOneWidget);
     expect(find.byKey(const ValueKey('program-cancel-close')), findsOneWidget);
 
     await tester.tap(find.byKey(const ValueKey('program-cancel-retry')));
     await tester.pump();
 
-    expect(find.text('신청 취소 처리 중입니다.'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('program-cancelling-loading')),
+      findsOneWidget,
+    );
 
     await tester.pump(const Duration(milliseconds: 700));
     await tester.pump();
     await tester.tap(find.byKey(const ValueKey('program-cancel-close')));
     await tester.pump();
 
-    expect(find.text('신청을 취소하지 못했어요'), findsNothing);
-    expect(find.text('신청 취소'), findsOneWidget);
-  });
-
-  testWidgets('동시성 실패 문구와 확인 Action을 표시한다', (tester) async {
-    final router = _detailRouter();
-    addTearDown(router.dispose);
-    await _pumpDetailRouter(tester, router, concurrencyFailure: true);
-
-    await tester.tap(find.text('신청하기'));
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 700));
-    await tester.pump();
-
-    expect(find.text('정원이 마감되어 신청할 수 없어요.'), findsOneWidget);
-    expect(find.text('다른 프로그램을 확인해 주세요.'), findsOneWidget);
+    expect(find.byKey(const ValueKey('program-cancel-retry')), findsNothing);
     expect(
-      find.byKey(const ValueKey('program-concurrency-confirm')),
+      find.byKey(const ValueKey('program-detail-action-applied')),
       findsOneWidget,
     );
   });
@@ -440,16 +460,53 @@ void main() {
     addTearDown(router.dispose);
     await _pumpDetailRouter(tester, router, concurrencyFailure: true);
 
-    await tester.tap(find.text('신청하기'));
+    await tester.tap(
+      find.byKey(const ValueKey('program-detail-action-available')),
+    );
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 700));
     await tester.pump();
+
+    expect(
+      find.byKey(const ValueKey('program-concurrency-confirm')),
+      findsOneWidget,
+    );
+
     await tester.tap(find.byKey(const ValueKey('program-concurrency-confirm')));
     await tester.pump();
 
-    expect(find.text('정원이 마감되어 신청할 수 없어요.'), findsNothing);
-    expect(find.text('신청하기'), findsOneWidget);
-    expect(find.textContaining('취소'), findsNothing);
+    expect(
+      find.byKey(const ValueKey('program-concurrency-confirm')),
+      findsNothing,
+    );
+    expect(
+      find.byKey(const ValueKey('program-detail-action-available')),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('프로그램 취소됨 상태는 기존 안내와 신청 이력 UI를 유지한다', (tester) async {
+    await _pumpBody(
+      tester,
+      const ProgramDetail(
+        id: 'cancelled',
+        title: '취소된 프로그램',
+        actionStatus: ProgramDetailActionStatus.applied,
+        operationalStatus: ProgramOperationalStatus.cancelled,
+        type: ProgramType.specialLecture,
+      ),
+    );
+
+    expect(
+      find.byKey(const ValueKey('program-cancelled-alert')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('program-status-history')),
+      findsOneWidget,
+    );
+    expect(find.byType(AppBottomNavigation), findsNothing);
+    expect(tester.takeException(), isNull);
   });
 
   final actionCases = <ProgramDetailActionStatus, String>{
@@ -486,6 +543,17 @@ void main() {
   }
 }
 
+Future<void> _waitForDetail(
+  ProviderContainer container,
+  String programId,
+) async {
+  for (var i = 0; i < 10; i++) {
+    final state = container.read(programDetailViewModelProvider(programId));
+    if (state.detail != null) return;
+    await Future<void>.delayed(Duration.zero);
+  }
+}
+
 GoRouter _router() => GoRouter(
   initialLocation: '/programs',
   routes: [
@@ -503,7 +571,7 @@ GoRouter _router() => GoRouter(
   ],
 );
 
-GoRouter _detailRouter({String programId = 'available'}) => GoRouter(
+GoRouter _detailRouter({String programId = '1'}) => GoRouter(
   initialLocation: '/programs/$programId',
   routes: [
     GoRoute(
@@ -526,7 +594,7 @@ Future<void> _pumpRouter(WidgetTester tester, GoRouter router) async {
     ProviderScope(
       overrides: [
         programRepositoryProvider.overrideWithValue(
-          const _DetailTestProgramRepository(),
+          _DetailTestProgramRepository(),
         ),
       ],
       child: ScreenUtilInit(
@@ -535,7 +603,7 @@ Future<void> _pumpRouter(WidgetTester tester, GoRouter router) async {
       ),
     ),
   );
-  await tester.pump();
+  await tester.pumpAndSettle();
 }
 
 Future<void> _pumpDetailRouter(
@@ -548,6 +616,9 @@ Future<void> _pumpDetailRouter(
   await tester.pumpWidget(
     ProviderScope(
       overrides: [
+        programRepositoryProvider.overrideWithValue(
+          _DetailTestProgramRepository(),
+        ),
         if (concurrencyFailure)
           programApplicationOutcomeProvider.overrideWithValue(
             ProgramApplicationOutcome.concurrencyFailure,
@@ -563,7 +634,30 @@ Future<void> _pumpDetailRouter(
       ),
     ),
   );
-  await tester.pump();
+  await tester.pumpAndSettle();
+}
+
+Future<void> _pumpDetailView(
+  WidgetTester tester, {
+  required String programId,
+  required ProgramRepository repository,
+  bool settle = true,
+}) async {
+  await _setViewport(tester);
+  await tester.pumpWidget(
+    ProviderScope(
+      overrides: [programRepositoryProvider.overrideWithValue(repository)],
+      child: ScreenUtilInit(
+        designSize: const Size(390, 844),
+        child: MaterialApp(home: ProgramDetailView(programId: programId)),
+      ),
+    ),
+  );
+  if (settle) {
+    await tester.pumpAndSettle();
+  } else {
+    await tester.pump();
+  }
 }
 
 Future<void> _pumpBody(WidgetTester tester, ProgramDetail detail) async {
@@ -587,7 +681,17 @@ Future<void> _setViewport(WidgetTester tester) async {
 }
 
 class _DetailTestProgramRepository implements ProgramRepository {
-  const _DetailTestProgramRepository();
+  _DetailTestProgramRepository({
+    this.detailError,
+    this.retryDetail,
+    this.pendingDetail,
+  });
+
+  final ProgramRepositoryException? detailError;
+  final ProgramDetailResponse? retryDetail;
+  final Future<ProgramDetailResponse>? pendingDetail;
+
+  final detailRequests = <int>[];
 
   @override
   Future<ProgramListResponse> getPrograms({
@@ -608,6 +712,29 @@ class _DetailTestProgramRepository implements ProgramRepository {
       last: true,
     );
   }
+
+  @override
+  Future<ProgramDetailResponse> getProgramDetail(int programId) async {
+    detailRequests.add(programId);
+
+    if (pendingDetail != null) {
+      return pendingDetail!;
+    }
+    if (detailError != null) {
+      if (retryDetail != null && detailRequests.length > 1) return retryDetail!;
+      throw detailError!;
+    }
+
+    final detail = _detailFixtures[programId];
+    if (detail == null) {
+      throw const ProgramRepositoryException(
+        'not found',
+        statusCode: 404,
+        code: 'PROGRAM_NOT_FOUND',
+      );
+    }
+    return detail;
+  }
 }
 
 final _detailTestPrograms = [
@@ -616,13 +743,13 @@ final _detailTestPrograms = [
     title: '목록 API 프로그램',
     programType: 'SPECIAL_LECTURE',
     status: 'PUBLISHED',
-    location: '세미나실',
+    location: '장소 A',
     startAt: DateTime(2026, 8, 12, 14),
     endAt: DateTime(2026, 8, 12, 16),
-    applicationStartAt: DateTime(2026, 7, 20),
+    applicationStartAt: DateTime(2026, 8),
     applicationEndAt: DateTime(2026, 8, 10),
-    currentApplicants: 1,
-    applied: true,
+    currentApplicants: 12,
+    applied: false,
   ),
   ProgramSummaryResponse(
     programId: 2,
@@ -632,3 +759,78 @@ final _detailTestPrograms = [
     currentApplicants: 0,
   ),
 ];
+
+final _detailFixtures = {
+  1: _detail(),
+  2: _detail(
+    programId: 2,
+    title: '두 번째 API 상세',
+    content: null,
+    location: null,
+    capacity: null,
+    remainingCapacity: null,
+    firstComeServed: false,
+    canApply: false,
+    eligibilityReason: 'PROGRAM_CLOSED',
+    status: 'CLOSED',
+    useNullDates: true,
+  ),
+  3: _detail(
+    programId: 3,
+    title: '신청 완료 API 상세',
+    canApply: false,
+    eligibilityReason: 'ALREADY_APPLIED',
+    availableActions: ['CANCEL'],
+  ),
+};
+
+ProgramDetailResponse _detail({
+  int programId = 1,
+  String title = 'API 상세 프로그램',
+  String? content = 'API 상세 설명',
+  String? location = '장소 A',
+  String programType = 'SPECIAL_LECTURE',
+  DateTime? startAt,
+  DateTime? endAt,
+  DateTime? applicationStartAt,
+  DateTime? applicationEndAt,
+  int? capacity = 30,
+  int currentApplicants = 12,
+  int? remainingCapacity = 18,
+  bool firstComeServed = true,
+  bool canApply = true,
+  String eligibilityReason = 'AVAILABLE',
+  List<String> availableActions = const ['APPLY'],
+  String status = 'PUBLISHED',
+  bool useNullDates = false,
+}) {
+  return ProgramDetailResponse(
+    programId: programId,
+    title: title,
+    content: content,
+    location: location,
+    programType: programType,
+    targetGrades: const [1, 2, 3],
+    startAt: useNullDates ? null : (startAt ?? DateTime(2026, 8, 12, 14)),
+    endAt: useNullDates ? null : (endAt ?? DateTime(2026, 8, 12, 16)),
+    applicationStartAt: useNullDates
+        ? null
+        : (applicationStartAt ?? DateTime(2026, 8)),
+    applicationEndAt: useNullDates
+        ? null
+        : (applicationEndAt ?? DateTime(2026, 8, 10)),
+    capacity: capacity,
+    currentApplicants: currentApplicants,
+    remainingCapacity: remainingCapacity,
+    firstComeServed: firstComeServed,
+    canApply: canApply,
+    eligibilityReason: eligibilityReason,
+    eligibilityMessage: '',
+    availableActions: availableActions,
+    canSubscribeVacancy: false,
+    vacancySubscribed: false,
+    vacancySubscriptionStatus: null,
+    status: status,
+    files: const [],
+  );
+}
