@@ -15,7 +15,6 @@ class ProgramCard extends StatelessWidget {
       ProgramRecruitmentStatus.full => ('정원 마감', _BadgeTone.brand),
       ProgramRecruitmentStatus.upcoming => ('모집 예정', _BadgeTone.neutral),
       ProgramRecruitmentStatus.closed => ('신청기간 종료', _BadgeTone.neutral),
-      ProgramRecruitmentStatus.cancelled => ('프로그램 취소', _BadgeTone.danger),
       ProgramRecruitmentStatus.deleted => ('삭제됨', _BadgeTone.neutral),
     };
     return Material(
@@ -94,7 +93,7 @@ class ProgramCard extends StatelessWidget {
   }
 }
 
-enum _BadgeTone { brand, neutral, danger }
+enum _BadgeTone { brand, neutral }
 
 class _Badge extends StatelessWidget {
   const _Badge({required this.label, required this.tone});
@@ -106,7 +105,6 @@ class _Badge extends StatelessWidget {
     final colors = switch (tone) {
       _BadgeTone.brand => (AppColors.primarySubtle, AppColors.primary),
       _BadgeTone.neutral => (AppColors.background, AppColors.neutral600),
-      _BadgeTone.danger => (AppColors.dangerBackground, AppColors.error),
     };
 
     return Container(

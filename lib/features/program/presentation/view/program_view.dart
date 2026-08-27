@@ -27,6 +27,7 @@ class ProgramView extends ConsumerWidget {
                 state: state,
                 onTabSelected: viewModel.selectTab,
                 onRetry: viewModel.retry,
+                onLoadMore: viewModel.loadMore,
               ),
             ),
           ],
@@ -48,11 +49,13 @@ class ProgramScreenBody extends StatelessWidget {
     required this.state,
     required this.onTabSelected,
     required this.onRetry,
+    required this.onLoadMore,
     super.key,
   });
   final ProgramViewState state;
   final ValueChanged<ProgramTab> onTabSelected;
   final VoidCallback onRetry;
+  final VoidCallback onLoadMore;
   @override
   Widget build(BuildContext context) => Center(
     child: SizedBox(
@@ -94,17 +97,37 @@ class ProgramScreenBody extends StatelessWidget {
         isAppliedTab: state.selectedTab == ProgramTab.applied,
       );
     }
-    return ListView.separated(
-      padding: EdgeInsets.only(bottom: 24.h),
-      itemCount: programs.length,
-      separatorBuilder: (_, _) => SizedBox(height: 12.h),
-      itemBuilder: (context, index) {
-        final program = programs[index];
-        return ProgramCard(
-          program: program,
-          onTap: () => context.push('/programs/${program.id}'),
-        );
+    return NotificationListener<ScrollNotification>(
+      onNotification: (notification) {
+        if (notification.metrics.extentAfter < 240.h) {
+          onLoadMore();
+        }
+        return false;
       },
+      child: ListView.separated(
+        padding: EdgeInsets.only(bottom: 24.h),
+        itemCount: programs.length + (state.isLoadingMore ? 1 : 0),
+        separatorBuilder: (_, _) => SizedBox(height: 12.h),
+        itemBuilder: (context, index) {
+          if (index >= programs.length) {
+            return SizedBox(
+              height: 48.h,
+              child: Center(
+                child: SizedBox(
+                  width: 20.w,
+                  height: 20.w,
+                  child: const CircularProgressIndicator(strokeWidth: 2),
+                ),
+              ),
+            );
+          }
+          final program = programs[index];
+          return ProgramCard(
+            program: program,
+            onTap: () => context.push('/programs/${program.id}'),
+          );
+        },
+      ),
     );
   }
 }

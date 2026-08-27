@@ -19,6 +19,48 @@ class _RestClient implements RestClient {
 
   final ParseErrorLogger? errorLogger;
 
+  @override
+  Future<ApiResponseProgramListResponse> getPrograms({
+    String? programType,
+    String? status,
+    bool? openOnly,
+    int page = 0,
+    int size = 20,
+    List<String>? sort,
+  }) async {
+    final _extra = <String, dynamic>{};
+    final queryParameters = <String, dynamic>{
+      r'programType': programType,
+      r'status': status,
+      r'openOnly': openOnly,
+      r'page': page,
+      r'size': size,
+      r'sort': sort,
+    };
+    queryParameters.removeWhere((k, v) => v == null);
+    final _headers = <String, dynamic>{};
+    const Map<String, dynamic>? _data = null;
+    final _options = _setStreamType<ApiResponseProgramListResponse>(
+      Options(method: 'GET', headers: _headers, extra: _extra)
+          .compose(
+            _dio.options,
+            '/api/v1/programs',
+            queryParameters: queryParameters,
+            data: _data,
+          )
+          .copyWith(baseUrl: _combineBaseUrls(_dio.options.baseUrl, baseUrl)),
+    );
+    final _result = await _dio.fetch<Map<String, dynamic>>(_options);
+    late ApiResponseProgramListResponse _value;
+    try {
+      _value = ApiResponseProgramListResponse.fromJson(_result.data!);
+    } on Object catch (e, s) {
+      errorLogger?.logError(e, s, _options, response: _result);
+      rethrow;
+    }
+    return _value;
+  }
+
   RequestOptions _setStreamType<T>(RequestOptions requestOptions) {
     if (T != dynamic &&
         !(requestOptions.responseType == ResponseType.bytes ||
