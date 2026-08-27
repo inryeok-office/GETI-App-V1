@@ -12,14 +12,7 @@ enum ProgramScreenStatus { loaded, loading, networkError }
 
 enum ProgramTab { all, applied }
 
-enum ProgramRecruitmentStatus {
-  recruiting,
-  full,
-  upcoming,
-  closed,
-  cancelled,
-  deleted,
-}
+enum ProgramRecruitmentStatus { recruiting, full, upcoming, closed, deleted }
 
 class ProgramItem {
   const ProgramItem({
@@ -51,7 +44,10 @@ class ProgramItem {
         summary.applicationStartAt,
         summary.applicationEndAt,
       ),
-      status: programRecruitmentStatusFrom(summary.status),
+      status: programRecruitmentStatusFrom(
+        summary.status,
+        remainingCapacity: summary.remainingCapacity,
+      ),
       type: programTypeFrom(summary.programType),
       isApplied: summary.applied,
     );
@@ -67,6 +63,7 @@ class ProgramViewState {
     this.totalElements = 0,
     this.totalPages = 0,
     this.hasMore = false,
+    this.isLoadingMore = false,
   });
   final ProgramScreenStatus screenStatus;
   final ProgramTab selectedTab;
@@ -75,6 +72,7 @@ class ProgramViewState {
   final int totalElements;
   final int totalPages;
   final bool hasMore;
+  final bool isLoadingMore;
   List<ProgramItem> get visiblePrograms => switch (selectedTab) {
     ProgramTab.all => programs,
     ProgramTab.applied =>
@@ -88,6 +86,7 @@ class ProgramViewState {
     int? totalElements,
     int? totalPages,
     bool? hasMore,
+    bool? isLoadingMore,
   }) => ProgramViewState(
     screenStatus: screenStatus ?? this.screenStatus,
     selectedTab: selectedTab ?? this.selectedTab,
@@ -96,6 +95,7 @@ class ProgramViewState {
     totalElements: totalElements ?? this.totalElements,
     totalPages: totalPages ?? this.totalPages,
     hasMore: hasMore ?? this.hasMore,
+    isLoadingMore: isLoadingMore ?? this.isLoadingMore,
   );
 }
 
@@ -103,48 +103,81 @@ const _programPageSize = 20;
 
 @riverpod
 class ProgramViewModel extends _$ProgramViewModel {
+  int _requestVersion = 0;
+
   @override
   ProgramViewState build() {
-    unawaited(Future.microtask(_fetchPrograms));
+    final requestVersion = _nextRequestVersion();
+    unawaited(
+      Future.microtask(() => _fetchPrograms(requestVersion: requestVersion)),
+    );
     return const ProgramViewState(screenStatus: ProgramScreenStatus.loading);
   }
 
   void selectTab(ProgramTab tab) => state = state.copyWith(selectedTab: tab);
 
-  Future<void> retry() => _fetchPrograms();
+  Future<void> retry() => _fetchPrograms(requestVersion: _nextRequestVersion());
 
-  Future<void> _fetchPrograms() async {
-    state = state.copyWith(screenStatus: ProgramScreenStatus.loading);
+  Future<void> loadMore() {
+    if (state.screenStatus != ProgramScreenStatus.loaded ||
+        state.isLoadingMore ||
+        !state.hasMore) {
+      return Future.value();
+    }
+    return _fetchPrograms(
+      page: state.currentPage + 1,
+      append: true,
+      requestVersion: _nextRequestVersion(),
+    );
+  }
+
+  int _nextRequestVersion() => ++_requestVersion;
+
+  Future<void> _fetchPrograms({
+    required int requestVersion,
+    int page = 0,
+    bool append = false,
+  }) async {
+    if (requestVersion != _requestVersion) return;
+    state = append
+        ? state.copyWith(isLoadingMore: true)
+        : state.copyWith(
+            screenStatus: ProgramScreenStatus.loading,
+            hasMore: false,
+            isLoadingMore: false,
+          );
     try {
       final repository = ref.read(programRepositoryProvider);
-      final programs = <ProgramItem>[];
-      ProgramListResponse? latestPage;
-      var page = 0;
+      final result = await repository.getPrograms(
+        page: page,
+        size: _programPageSize,
+      );
+      if (!ref.mounted || requestVersion != _requestVersion) return;
 
-      while (true) {
-        final result = await repository.getPrograms(
-          page: page,
-          size: _programPageSize,
-        );
-        if (!ref.mounted) return;
-
-        latestPage = result;
-        programs.addAll(result.content.map(ProgramItem.fromSummary));
-        if (result.last || result.content.isEmpty) break;
-        page = result.page + 1;
-      }
+      final fetchedPrograms = result.content
+          .map(ProgramItem.fromSummary)
+          .toList(growable: false);
+      final programs = append
+          ? [...state.programs, ...fetchedPrograms]
+          : fetchedPrograms;
 
       state = state.copyWith(
         screenStatus: ProgramScreenStatus.loaded,
         programs: programs,
-        currentPage: latestPage.page,
-        totalElements: latestPage.totalElements,
-        totalPages: latestPage.totalPages,
-        hasMore: !latestPage.last,
+        currentPage: result.page,
+        totalElements: result.totalElements,
+        totalPages: result.totalPages,
+        hasMore: !result.last && result.content.isNotEmpty,
+        isLoadingMore: false,
       );
     } catch (_) {
-      if (!ref.mounted) return;
-      state = state.copyWith(screenStatus: ProgramScreenStatus.networkError);
+      if (!ref.mounted || requestVersion != _requestVersion) return;
+      state = append
+          ? state.copyWith(isLoadingMore: false)
+          : state.copyWith(
+              screenStatus: ProgramScreenStatus.networkError,
+              isLoadingMore: false,
+            );
     }
   }
 }
@@ -154,14 +187,21 @@ ProgramType programTypeFrom(String raw) => switch (raw) {
   _ => ProgramType.specialLecture,
 };
 
-ProgramRecruitmentStatus programRecruitmentStatusFrom(String raw) =>
-    switch (raw) {
-      'DRAFT' => ProgramRecruitmentStatus.upcoming,
-      'PUBLISHED' => ProgramRecruitmentStatus.recruiting,
-      'CLOSED' => ProgramRecruitmentStatus.closed,
-      'DELETED' => ProgramRecruitmentStatus.deleted,
-      _ => ProgramRecruitmentStatus.closed,
-    };
+ProgramRecruitmentStatus programRecruitmentStatusFrom(
+  String raw, {
+  int? remainingCapacity,
+}) {
+  if (raw == 'PUBLISHED' && remainingCapacity == 0) {
+    return ProgramRecruitmentStatus.full;
+  }
+  return switch (raw) {
+    'DRAFT' => ProgramRecruitmentStatus.upcoming,
+    'PUBLISHED' => ProgramRecruitmentStatus.recruiting,
+    'CLOSED' => ProgramRecruitmentStatus.closed,
+    'DELETED' => ProgramRecruitmentStatus.deleted,
+    _ => ProgramRecruitmentStatus.closed,
+  };
+}
 
 String _textOrFallback(String? value, String fallback) {
   final trimmed = value?.trim();
@@ -214,16 +254,6 @@ const mockPrograms = [
     location: '광주소프트웨어마이스터고 시청각실',
     applicationPeriod: '2026.07.20 – 2026.08.10',
     status: ProgramRecruitmentStatus.recruiting,
-    type: ProgramType.specialLecture,
-    isApplied: true,
-  ),
-  ProgramItem(
-    id: 'cancelled',
-    title: '현직자와 함께하는 프론트엔드 특강',
-    schedule: '08.12 14:00–16:00',
-    location: '광주소프트웨어마이스터고 시청각실',
-    applicationPeriod: '2026.07.20 – 2026.08.10',
-    status: ProgramRecruitmentStatus.cancelled,
     type: ProgramType.specialLecture,
     isApplied: true,
   ),

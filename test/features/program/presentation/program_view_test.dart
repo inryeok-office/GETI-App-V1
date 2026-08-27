@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
@@ -40,6 +42,10 @@ void main() {
     expect(
       programRecruitmentStatusFrom('PUBLISHED'),
       ProgramRecruitmentStatus.recruiting,
+    );
+    expect(
+      programRecruitmentStatusFrom('PUBLISHED', remainingCapacity: 0),
+      ProgramRecruitmentStatus.full,
     );
     expect(
       programRecruitmentStatusFrom('CLOSED'),
@@ -127,7 +133,7 @@ void main() {
     expect(find.byKey(const ValueKey('program-retry')), findsOneWidget);
   });
 
-  test('repository pagination metadata is preserved in state', () async {
+  test('first page metadata is preserved in state', () async {
     final container = ProviderContainer(
       overrides: [
         programRepositoryProvider.overrideWithValue(
@@ -136,14 +142,79 @@ void main() {
       ],
     );
     addTearDown(container.dispose);
+    final subscription = container.listen(
+      programViewModelProvider,
+      (_, _) {},
+      fireImmediately: true,
+    );
+    addTearDown(subscription.close);
 
     await container.read(programViewModelProvider.notifier).retry();
     final state = container.read(programViewModelProvider);
 
-    expect(state.programs, hasLength(_programFixtures.length));
+    expect(state.programs, hasLength(2));
     expect(state.totalElements, _programFixtures.length);
     expect(state.totalPages, 2);
-    expect(state.hasMore, isFalse);
+    expect(state.hasMore, isTrue);
+  });
+
+  test(
+    'loadMore appends the next page only when more content exists',
+    () async {
+      final container = ProviderContainer(
+        overrides: [
+          programRepositoryProvider.overrideWithValue(
+            const _FakeProgramRepository(pageSize: 2),
+          ),
+        ],
+      );
+      addTearDown(container.dispose);
+      final subscription = container.listen(
+        programViewModelProvider,
+        (_, _) {},
+        fireImmediately: true,
+      );
+      addTearDown(subscription.close);
+
+      await container.read(programViewModelProvider.notifier).retry();
+      await container.read(programViewModelProvider.notifier).loadMore();
+      final state = container.read(programViewModelProvider);
+
+      expect(state.programs, hasLength(_programFixtures.length));
+      expect(state.currentPage, 1);
+      expect(state.hasMore, isFalse);
+    },
+  );
+
+  test('older program list responses do not overwrite newer retries', () async {
+    final repository = _DeferredProgramRepository();
+    final container = ProviderContainer(
+      overrides: [programRepositoryProvider.overrideWithValue(repository)],
+    );
+    addTearDown(container.dispose);
+    final subscription = container.listen(
+      programViewModelProvider,
+      (_, _) {},
+      fireImmediately: true,
+    );
+    addTearDown(subscription.close);
+
+    final notifier = container.read(programViewModelProvider.notifier);
+    await Future<void>.delayed(Duration.zero);
+    repository.completeNext(_programListResponse([]));
+    await Future<void>.delayed(Duration.zero);
+
+    final firstRetry = notifier.retry();
+    final secondRetry = notifier.retry();
+
+    repository.completeLast(_programListResponse([_programFixtures[0]]));
+    await secondRetry;
+
+    repository.completeNext(_programListResponse([_programFixtures[1]]));
+    await firstRetry;
+
+    final state = container.read(programViewModelProvider);
+    expect(state.programs.map((program) => program.id), ['1']);
   });
 }
 
@@ -183,12 +254,51 @@ Future<void> _pumpBody(
             state: state,
             onTabSelected: (_) {},
             onRetry: onRetry ?? () {},
+            onLoadMore: () {},
           ),
         ),
       ),
     ),
   );
   await tester.pump();
+}
+
+class _DeferredProgramRepository implements ProgramRepository {
+  final _requests = <Completer<ProgramListResponse>>[];
+
+  void completeNext(ProgramListResponse response) {
+    _requests.removeAt(0).complete(response);
+  }
+
+  void completeLast(ProgramListResponse response) {
+    _requests.removeLast().complete(response);
+  }
+
+  @override
+  Future<ProgramListResponse> getPrograms({
+    String? programType,
+    String? status,
+    bool? openOnly,
+    int page = 0,
+    int size = 20,
+    List<String>? sort,
+  }) {
+    final completer = Completer<ProgramListResponse>();
+    _requests.add(completer);
+    return completer.future;
+  }
+}
+
+ProgramListResponse _programListResponse(List<ProgramSummaryResponse> content) {
+  return ProgramListResponse(
+    content: content,
+    page: 0,
+    size: content.length,
+    totalElements: content.length,
+    totalPages: 1,
+    first: true,
+    last: true,
+  );
 }
 
 Future<void> _setViewport(WidgetTester tester) async {

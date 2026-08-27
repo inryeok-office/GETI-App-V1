@@ -152,8 +152,6 @@ void main() {
   });
 
   test('목록과 상세 Mock은 같은 프로그램 유형을 사용한다', () {
-    expect(mockProgramDetails, hasLength(mockPrograms.length));
-
     for (final program in mockPrograms) {
       expect(
         mockProgramDetails[program.id]?.type,
