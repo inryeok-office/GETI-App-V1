@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:geti_app/features/program/data/dto/program_detail_response.dart';
 import 'package:geti_app/features/program/data/dto/program_list_response.dart';
 import 'package:geti_app/features/program/data/program_repository.dart';
 import 'package:geti_app/features/program/presentation/view/program_view.dart';
@@ -235,6 +236,11 @@ class _FakeProgramRepository implements ProgramRepository {
       first: page == 0,
       last: start + content.length >= _programFixtures.length,
     );
+  }
+
+  @override
+  Future<ProgramDetailResponse> getProgramDetail(int programId) {
+    throw UnimplementedError();
   }
 }
 

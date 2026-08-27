@@ -2,8 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:geti_app/features/program/presentation/view_model/program_detail_view_model.dart';
-import 'package:geti_app/features/program/presentation/widgets/program_detail_sections.dart';
 import 'package:geti_app/features/program/presentation/widgets/program_application_overlay.dart';
+import 'package:geti_app/features/program/presentation/widgets/program_detail_sections.dart';
+import 'package:geti_app/features/program/presentation/widgets/program_state_content.dart';
 import 'package:geti_app/shared/theme/app_colors.dart';
 import 'package:geti_app/shared/theme/app_typography.dart';
 import 'package:go_router/go_router.dart';
@@ -26,36 +27,24 @@ class _ProgramDetailViewState extends ConsumerState<ProgramDetailView> {
       programDetailViewModelProvider(widget.programId).notifier,
     );
     final detail = state.detail;
-    if (detail == null) {
-      return Scaffold(
-        backgroundColor: AppColors.background,
-        appBar: AppBar(
-          toolbarHeight: 56.h,
-          elevation: 0,
-          scrolledUnderElevation: 0,
-          backgroundColor: AppColors.surface,
-          surfaceTintColor: AppColors.surface,
-          shape: const Border(bottom: BorderSide(color: AppColors.neutral200)),
-          leadingWidth: 52.w,
-          leading: IconButton(
-            key: const ValueKey('program-detail-back'),
-            onPressed: () {
-              if (context.canPop()) {
-                context.pop();
-              } else {
-                context.go('/programs');
-              }
-            },
-            icon: Icon(Icons.chevron_left, size: 28.w),
-            color: AppColors.neutral600,
-          ),
-          titleSpacing: 0,
-          title: Text(
-            '?꾨줈洹몃옩 ?곸꽭',
-            style: AppTypography.heading2.copyWith(color: AppColors.neutral900),
-          ),
-        ),
+
+    if (state.screenStatus == ProgramDetailScreenStatus.loading) {
+      return _ProgramDetailScaffold(
+        body: const ProgramLoadingState(),
+        onBack: () => _goBack(context),
+      );
+    }
+    if (state.screenStatus == ProgramDetailScreenStatus.networkError) {
+      return _ProgramDetailScaffold(
+        body: ProgramNetworkErrorState(onRetry: viewModel.retry),
+        onBack: () => _goBack(context),
+      );
+    }
+    if (state.screenStatus == ProgramDetailScreenStatus.notFound ||
+        detail == null) {
+      return _ProgramDetailScaffold(
         body: Center(
+          key: const ValueKey('program-detail-not-found'),
           child: Text(
             '프로그램 정보를 찾을 수 없습니다.',
             style: AppTypography.bodyLarge.copyWith(
@@ -63,42 +52,15 @@ class _ProgramDetailViewState extends ConsumerState<ProgramDetailView> {
             ),
           ),
         ),
+        onBack: () => _goBack(context),
       );
     }
+
     return Stack(
       children: [
         Scaffold(
           backgroundColor: AppColors.background,
-          appBar: AppBar(
-            toolbarHeight: 56.h,
-            elevation: 0,
-            scrolledUnderElevation: 0,
-            backgroundColor: AppColors.surface,
-            surfaceTintColor: AppColors.surface,
-            shape: const Border(
-              bottom: BorderSide(color: AppColors.neutral200),
-            ),
-            leadingWidth: 52.w,
-            leading: IconButton(
-              key: const ValueKey('program-detail-back'),
-              onPressed: () {
-                if (context.canPop()) {
-                  context.pop();
-                } else {
-                  context.go('/programs');
-                }
-              },
-              icon: Icon(Icons.chevron_left, size: 28.w),
-              color: AppColors.neutral600,
-            ),
-            titleSpacing: 0,
-            title: Text(
-              '프로그램 상세',
-              style: AppTypography.heading2.copyWith(
-                color: AppColors.neutral900,
-              ),
-            ),
-          ),
+          appBar: _ProgramDetailAppBar(onBack: () => _goBack(context)),
           body: ProgramDetailBody(
             detail: detail,
             onApply: viewModel.applyProgram,
@@ -290,5 +252,63 @@ class ProgramDetailAction extends StatelessWidget {
         ),
       ),
     );
+  }
+}
+
+class _ProgramDetailScaffold extends StatelessWidget {
+  const _ProgramDetailScaffold({required this.body, required this.onBack});
+
+  final Widget body;
+  final VoidCallback onBack;
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: AppColors.background,
+      appBar: _ProgramDetailAppBar(onBack: onBack),
+      body: body,
+    );
+  }
+}
+
+class _ProgramDetailAppBar extends StatelessWidget
+    implements PreferredSizeWidget {
+  const _ProgramDetailAppBar({required this.onBack});
+
+  final VoidCallback onBack;
+
+  @override
+  Size get preferredSize => Size.fromHeight(56.h);
+
+  @override
+  Widget build(BuildContext context) {
+    return AppBar(
+      toolbarHeight: 56.h,
+      elevation: 0,
+      scrolledUnderElevation: 0,
+      backgroundColor: AppColors.surface,
+      surfaceTintColor: AppColors.surface,
+      shape: const Border(bottom: BorderSide(color: AppColors.neutral200)),
+      leadingWidth: 52.w,
+      leading: IconButton(
+        key: const ValueKey('program-detail-back'),
+        onPressed: onBack,
+        icon: Icon(Icons.chevron_left, size: 28.w),
+        color: AppColors.neutral600,
+      ),
+      titleSpacing: 0,
+      title: Text(
+        '프로그램 상세',
+        style: AppTypography.heading2.copyWith(color: AppColors.neutral900),
+      ),
+    );
+  }
+}
+
+void _goBack(BuildContext context) {
+  if (context.canPop()) {
+    context.pop();
+  } else {
+    context.go('/programs');
   }
 }
