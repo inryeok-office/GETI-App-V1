@@ -1,3 +1,7 @@
+import 'dart:async';
+
+import 'package:geti_app/features/notification/data/repository/notification_repository_impl.dart';
+import 'package:geti_app/features/notification/domain/model/notification_summary.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 part 'notification_view_model.g.dart';
@@ -25,6 +29,14 @@ class NotificationItem {
     required this.time,
     required this.isRead,
     this.targetState,
+    this.notificationType,
+    this.targetType,
+    this.targetId,
+    this.targetAvailable = true,
+    this.targetUnavailableReason,
+    this.deepLink,
+    this.readAt,
+    this.createdAt,
   });
 
   final String id;
@@ -33,6 +45,14 @@ class NotificationItem {
   final String time;
   final bool isRead;
   final NotificationTargetState? targetState;
+  final NotificationType? notificationType;
+  final NotificationTargetType? targetType;
+  final int? targetId;
+  final bool targetAvailable;
+  final NotificationUnavailableReason? targetUnavailableReason;
+  final String? deepLink;
+  final DateTime? readAt;
+  final DateTime? createdAt;
 
   NotificationItem copyWith({bool? isRead}) {
     return NotificationItem(
@@ -42,57 +62,132 @@ class NotificationItem {
       time: time,
       isRead: isRead ?? this.isRead,
       targetState: targetState,
+      notificationType: notificationType,
+      targetType: targetType,
+      targetId: targetId,
+      targetAvailable: targetAvailable,
+      targetUnavailableReason: targetUnavailableReason,
+      deepLink: deepLink,
+      readAt: readAt,
+      createdAt: createdAt,
     );
   }
 }
 
 class NotificationViewState {
   const NotificationViewState({
-    this.screenStatus = NotificationScreenStatus.loaded,
+    this.screenStatus = NotificationScreenStatus.loading,
     this.selectedFilter = NotificationFilter.all,
-    this.notifications = mockNotifications,
+    this.notifications = const [],
+    this.unreadCount = 0,
   });
 
   final NotificationScreenStatus screenStatus;
   final NotificationFilter selectedFilter;
   final List<NotificationItem> notifications;
+  final int unreadCount;
 
-  int get unreadCount =>
-      notifications.where((notification) => !notification.isRead).length;
-
-  List<NotificationItem> get visibleNotifications {
-    return switch (selectedFilter) {
-      NotificationFilter.all => notifications,
-      NotificationFilter.unread =>
-        notifications
-            .where((notification) => !notification.isRead)
-            .toList(growable: false),
-    };
-  }
+  List<NotificationItem> get visibleNotifications => notifications;
 
   NotificationViewState copyWith({
     NotificationScreenStatus? screenStatus,
     NotificationFilter? selectedFilter,
     List<NotificationItem>? notifications,
+    int? unreadCount,
   }) {
     return NotificationViewState(
       screenStatus: screenStatus ?? this.screenStatus,
       selectedFilter: selectedFilter ?? this.selectedFilter,
       notifications: notifications ?? this.notifications,
+      unreadCount: unreadCount ?? this.unreadCount,
     );
   }
 }
 
 @riverpod
 class NotificationViewModel extends _$NotificationViewModel {
+  var _requestSerial = 0;
+
   @override
-  NotificationViewState build() => const NotificationViewState();
+  NotificationViewState build() {
+    unawaited(Future<void>.microtask(_loadNotifications));
+    return const NotificationViewState();
+  }
 
   void selectFilter(NotificationFilter filter) {
+    if (state.selectedFilter == filter) return;
     state = state.copyWith(selectedFilter: filter);
+    unawaited(_loadNotifications());
+  }
+
+  Future<void> retry() => _loadNotifications();
+
+  Future<void> _loadNotifications() async {
+    final requestSerial = ++_requestSerial;
+    final filter = state.selectedFilter;
+    state = state.copyWith(
+      screenStatus: NotificationScreenStatus.loading,
+      notifications: const [],
+    );
+
+    try {
+      final result = await ref
+          .read(notificationRepositoryProvider)
+          .getNotifications(unreadOnly: filter == NotificationFilter.unread);
+      if (!ref.mounted || requestSerial != _requestSerial) return;
+
+      state = state.copyWith(
+        screenStatus: NotificationScreenStatus.loaded,
+        notifications: result.notifications
+            .map(_toPresentation)
+            .toList(growable: false),
+        unreadCount: result.unreadCount,
+      );
+    } on Object {
+      if (!ref.mounted || requestSerial != _requestSerial) return;
+      state = state.copyWith(
+        screenStatus: NotificationScreenStatus.networkError,
+        notifications: const [],
+      );
+    }
+  }
+
+  NotificationItem _toPresentation(NotificationSummary notification) {
+    return NotificationItem(
+      id: notification.notificationId.toString(),
+      title: notification.title,
+      description: notification.content,
+      time: _formatRelativeTime(notification.createdAt),
+      isRead: notification.isRead,
+      targetState: _toTargetState(notification),
+      notificationType: notification.notificationType,
+      targetType: notification.targetType,
+      targetId: notification.targetId,
+      targetAvailable: notification.targetAvailable,
+      targetUnavailableReason: notification.targetUnavailableReason,
+      deepLink: notification.deepLink,
+      readAt: notification.readAt,
+      createdAt: notification.createdAt,
+    );
+  }
+
+  NotificationTargetState? _toTargetState(NotificationSummary notification) {
+    if (notification.targetAvailable) return null;
+    return switch (notification.targetUnavailableReason) {
+      NotificationUnavailableReason.deleted => NotificationTargetState.deleted,
+      NotificationUnavailableReason.notVisible ||
+      NotificationUnavailableReason.forbidden =>
+        NotificationTargetState.forbidden,
+      NotificationUnavailableReason.unknown || null => null,
+    };
   }
 
   void markAsRead(String id) {
+    final target = state.notifications
+        .where((notification) => notification.id == id)
+        .firstOrNull;
+    if (target == null || target.isRead) return;
+
     state = state.copyWith(
       notifications: [
         for (final notification in state.notifications)
@@ -100,6 +195,9 @@ class NotificationViewModel extends _$NotificationViewModel {
               ? notification.copyWith(isRead: true)
               : notification,
       ],
+      unreadCount: state.unreadCount > 0
+          ? state.unreadCount - 1
+          : state.unreadCount,
     );
   }
 
@@ -120,46 +218,24 @@ class NotificationViewModel extends _$NotificationViewModel {
         for (final notification in state.notifications)
           notification.copyWith(isRead: true),
       ],
+      unreadCount: 0,
     );
   }
 
-  Future<void> retry() async {
-    state = state.copyWith(screenStatus: NotificationScreenStatus.loading);
-    await Future<void>.delayed(const Duration(milliseconds: 700));
-    if (!ref.mounted) return;
-    state = state.copyWith(screenStatus: NotificationScreenStatus.loaded);
+  String _formatRelativeTime(DateTime createdAt) {
+    final difference = DateTime.now().difference(createdAt.toLocal());
+    if (difference.isNegative || difference < const Duration(minutes: 1)) {
+      return '방금';
+    }
+    if (difference < const Duration(hours: 1)) {
+      return '${difference.inMinutes}분 전';
+    }
+    if (difference < const Duration(days: 1)) {
+      return '${difference.inHours}시간 전';
+    }
+    if (difference < const Duration(days: 2)) {
+      return '어제';
+    }
+    return '${difference.inDays}일 전';
   }
 }
-
-const mockNotifications = [
-  NotificationItem(
-    id: 'application-status',
-    title: '지원 상태가 변경되었습니다.',
-    description: '토스페이먼츠 지원서가 검토 중으로 변경되었습니다.',
-    time: '방금',
-    isRead: false,
-  ),
-  NotificationItem(
-    id: 'matched-jobs',
-    title: '새로운 맞춤 공고가 도착했습니다.',
-    description: '기술 스택과 잘 맞는 공고 3개를 확인해 보세요.',
-    time: '1시간 전',
-    isRead: false,
-  ),
-  NotificationItem(
-    id: 'program-applied',
-    title: '프로그램 신청이 완료되었습니다.',
-    description: '프론트엔드 특강 신청이 완료되었습니다.',
-    time: '어제',
-    isRead: true,
-    targetState: NotificationTargetState.deleted,
-  ),
-  NotificationItem(
-    id: 'portfolio-request',
-    title: '포트폴리오 제출 요청',
-    description: '2026 상반기 포트폴리오 제출 요청이 도착했습니다.',
-    time: '2일 전',
-    isRead: true,
-    targetState: NotificationTargetState.forbidden,
-  ),
-];
