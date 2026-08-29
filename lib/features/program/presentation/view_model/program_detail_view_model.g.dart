@@ -157,7 +157,7 @@ final class ProgramDetailViewModelProvider
 }
 
 String _$programDetailViewModelHash() =>
-    r'83cd52bcf9765495e3980c5bd19ed5e8015da1ee';
+    r'ebf78c236e916845175212b89ea0d76374df1106';
 
 final class ProgramDetailViewModelFamily extends $Family
     with

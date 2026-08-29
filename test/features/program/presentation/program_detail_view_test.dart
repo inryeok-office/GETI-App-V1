@@ -32,6 +32,9 @@ void main() {
       'endAt': null,
       'applicationStartAt': '2026-08-01T00:00:00',
       'applicationEndAt': '2026-08-10T23:59:00',
+      'applicationSubmittedAt': '2026-08-02T14:32:00',
+      'applicationCancelledAt': '2026-08-08T15:20:00',
+      'programDeletedAt': '2026-08-09T10:30:00',
       'capacity': null,
       'currentApplicants': 12,
       'remainingCapacity': null,
@@ -64,6 +67,9 @@ void main() {
     expect(response.remainingCapacity, isNull);
     expect(response.availableActions, ['CANCEL']);
     expect(response.files.single.originalName, 'guide.pdf');
+    expect(response.applicationSubmittedAt, DateTime(2026, 8, 2, 14, 32));
+    expect(response.applicationCancelledAt, DateTime(2026, 8, 8, 15, 20));
+    expect(response.programDeletedAt, DateTime(2026, 8, 9, 10, 30));
   });
 
   test('ProgramDetailResponse maps server action fields to UI status', () {
@@ -111,6 +117,28 @@ void main() {
       ),
       ProgramDetailActionStatus.closed,
     );
+    expect(
+      programDetailActionStatusFrom(
+        _detail(
+          canApply: false,
+          eligibilityReason: 'NOT_ENROLLED',
+          eligibilityMessage: '재학생만 신청할 수 있습니다.',
+          availableActions: const [],
+        ),
+      ),
+      ProgramDetailActionStatus.ineligible,
+    );
+    expect(
+      programDetailActionStatusFrom(
+        _detail(
+          canApply: false,
+          eligibilityReason: 'NOT_TARGET_GRADE',
+          eligibilityMessage: '대상 학년만 신청할 수 있습니다.',
+          availableActions: const [],
+        ),
+      ),
+      ProgramDetailActionStatus.ineligible,
+    );
   });
 
   test('ProgramDetail maps API detail to existing UI model safely', () {
@@ -127,6 +155,23 @@ void main() {
     expect(detail.currentApplicants, '12명');
     expect(detail.remainingCapacity, '18명');
     expect(detail.admissionType, '선착순');
+  });
+
+  test('삭제된 상세의 신청일과 삭제일을 기존 이력 UI 모델에 연결한다', () {
+    final detail = ProgramDetail.fromResponse(
+      _detail(
+        status: 'DELETED',
+        canApply: false,
+        eligibilityReason: 'PROGRAM_CLOSED',
+        availableActions: const [],
+        applicationSubmittedAt: DateTime(2026, 8, 1, 14, 32),
+        programDeletedAt: DateTime(2026, 8, 5, 10, 30),
+      ),
+    );
+
+    expect(detail.operationalStatus, ProgramOperationalStatus.deleted);
+    expect(detail.applicationSubmittedAt, '2026.08.01 14:32');
+    expect(detail.programStatusChangedAt, '2026.08.05 10:30');
   });
 
   testWidgets('프로그램 목록 카드에서 API programId 상세 Route로 이동한다', (tester) async {
@@ -214,6 +259,24 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  test('초기 조회 microtask 전에 dispose되면 상태와 API를 갱신하지 않는다', () async {
+    final repository = _DetailTestProgramRepository();
+    final container = ProviderContainer(
+      overrides: [programRepositoryProvider.overrideWithValue(repository)],
+    );
+    final subscription = container.listen(
+      programDetailViewModelProvider('1'),
+      (_, _) {},
+      fireImmediately: true,
+    );
+
+    subscription.close();
+    container.dispose();
+    await pumpEventQueue();
+
+    expect(repository.detailRequests, isEmpty);
+  });
+
   testWidgets('404 PROGRAM_NOT_FOUND는 not-found 상태를 표시한다', (tester) async {
     await _pumpDetailView(
       tester,
@@ -233,22 +296,32 @@ void main() {
     );
   });
 
-  testWidgets('410 PROGRAM_DELETED는 기존 삭제된 프로그램 UI를 표시한다', (tester) async {
+  testWidgets('200 DELETED 응답은 보존된 날짜와 기존 삭제 UI를 표시한다', (tester) async {
     await _pumpDetailView(
       tester,
-      programId: '410',
-      repository: _DetailTestProgramRepository(
-        detailError: ProgramRepositoryException(
-          'deleted',
-          statusCode: 410,
-          code: 'PROGRAM_DELETED',
-        ),
-      ),
+      programId: '4',
+      repository: _DetailTestProgramRepository(),
     );
 
     expect(find.byType(ProgramDeletedDetailBody), findsOneWidget);
     expect(
       find.byKey(const ValueKey('program-status-history')),
+      findsOneWidget,
+    );
+    expect(find.text('2026.08.01 14:32'), findsOneWidget);
+    expect(find.text('삭제됨 (2026.08.05 10:30)'), findsOneWidget);
+  });
+
+  testWidgets('대상 학년이 아니면 서버 eligibilityMessage를 표시한다', (tester) async {
+    await _pumpDetailView(
+      tester,
+      programId: '5',
+      repository: _DetailTestProgramRepository(),
+    );
+
+    expect(find.text('대상 학년만 신청할 수 있습니다.'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('program-detail-action-ineligible')),
       findsOneWidget,
     );
   });
@@ -514,6 +587,7 @@ void main() {
     ProgramDetailActionStatus.upcoming: '모집 전입니다.',
     ProgramDetailActionStatus.full: '정원이 마감되었습니다.',
     ProgramDetailActionStatus.closed: '신청 기간이 종료되었습니다.',
+    ProgramDetailActionStatus.ineligible: '신청할 수 없습니다.',
     ProgramDetailActionStatus.applied: '신청 취소',
     ProgramDetailActionStatus.cancelling: '신청 취소',
     ProgramDetailActionStatus.cancelled: '신청 취소 완료',
@@ -782,6 +856,25 @@ final _detailFixtures = {
     eligibilityReason: 'ALREADY_APPLIED',
     availableActions: ['CANCEL'],
   ),
+  4: _detail(
+    programId: 4,
+    title: '삭제된 API 상세',
+    canApply: false,
+    eligibilityReason: 'PROGRAM_CLOSED',
+    eligibilityMessage: '삭제된 프로그램입니다.',
+    availableActions: const [],
+    status: 'DELETED',
+    applicationSubmittedAt: DateTime(2026, 8, 1, 14, 32),
+    programDeletedAt: DateTime(2026, 8, 5, 10, 30),
+  ),
+  5: _detail(
+    programId: 5,
+    title: '대상 학년 제한 프로그램',
+    canApply: false,
+    eligibilityReason: 'NOT_TARGET_GRADE',
+    eligibilityMessage: '대상 학년만 신청할 수 있습니다.',
+    availableActions: const [],
+  ),
 };
 
 ProgramDetailResponse _detail({
@@ -794,12 +887,16 @@ ProgramDetailResponse _detail({
   DateTime? endAt,
   DateTime? applicationStartAt,
   DateTime? applicationEndAt,
+  DateTime? applicationSubmittedAt,
+  DateTime? applicationCancelledAt,
+  DateTime? programDeletedAt,
   int? capacity = 30,
   int currentApplicants = 12,
   int? remainingCapacity = 18,
   bool firstComeServed = true,
   bool canApply = true,
   String eligibilityReason = 'AVAILABLE',
+  String eligibilityMessage = '',
   List<String> availableActions = const ['APPLY'],
   String status = 'PUBLISHED',
   bool useNullDates = false,
@@ -819,13 +916,16 @@ ProgramDetailResponse _detail({
     applicationEndAt: useNullDates
         ? null
         : (applicationEndAt ?? DateTime(2026, 8, 10)),
+    applicationSubmittedAt: applicationSubmittedAt,
+    applicationCancelledAt: applicationCancelledAt,
+    programDeletedAt: programDeletedAt,
     capacity: capacity,
     currentApplicants: currentApplicants,
     remainingCapacity: remainingCapacity,
     firstComeServed: firstComeServed,
     canApply: canApply,
     eligibilityReason: eligibilityReason,
-    eligibilityMessage: '',
+    eligibilityMessage: eligibilityMessage,
     availableActions: availableActions,
     canSubscribeVacancy: false,
     vacancySubscribed: false,

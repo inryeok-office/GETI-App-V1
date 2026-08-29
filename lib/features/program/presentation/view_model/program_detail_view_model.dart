@@ -23,13 +23,22 @@ enum ProgramDetailActionStatus {
   upcoming,
   full,
   closed,
+  ineligible,
   applied,
   cancelling,
   cancelled,
   cancelFailure,
 }
 
-enum ProgramOperationalStatus { active, cancelled, deleted }
+enum ProgramOperationalStatus {
+  active,
+
+  // Legacy UI-only state. The current Swagger response has no program-level
+  // cancellation status or reason, so API data must not infer this state from
+  // applicationCancelledAt (which represents the student's application).
+  cancelled,
+  deleted,
+}
 
 enum ProgramApplicationOutcome { success, concurrencyFailure }
 
@@ -63,6 +72,7 @@ class ProgramDetail {
     this.currentApplicants = '0명',
     this.remainingCapacity = '남은 인원 미정',
     this.admissionType = '선착순 아님',
+    this.eligibilityMessage = '',
     this.cancellationDate = '2026.08.08 (금) 15:20',
     this.cancellationReason = '사용자 취소',
     this.applicationSubmittedAt = '확인 불가',
@@ -92,17 +102,12 @@ class ProgramDetail {
       currentApplicants: '${response.currentApplicants}명',
       remainingCapacity: _countLabel(response.remainingCapacity, '남은 인원 미정'),
       admissionType: response.firstComeServed ? '선착순' : '선착순 아님',
-    );
-  }
-
-  factory ProgramDetail.deletedFallback(String programId) {
-    return ProgramDetail(
-      id: programId,
-      title: '삭제된 프로그램입니다.',
-      actionStatus: ProgramDetailActionStatus.applied,
-      operationalStatus: ProgramOperationalStatus.deleted,
-      type: ProgramType.specialLecture,
-      recruitmentBadge: '삭제됨',
+      eligibilityMessage: response.eligibilityMessage,
+      cancellationDate: _dateTimeOrFallback(response.applicationCancelledAt),
+      applicationSubmittedAt: _dateTimeOrFallback(
+        response.applicationSubmittedAt,
+      ),
+      programStatusChangedAt: _dateTimeOrFallback(response.programDeletedAt),
     );
   }
 
@@ -122,6 +127,7 @@ class ProgramDetail {
   final String currentApplicants;
   final String remainingCapacity;
   final String admissionType;
+  final String eligibilityMessage;
   final String cancellationDate;
   final String cancellationReason;
   final String applicationSubmittedAt;
@@ -150,6 +156,7 @@ class ProgramDetail {
       currentApplicants: currentApplicants,
       remainingCapacity: remainingCapacity,
       admissionType: admissionType,
+      eligibilityMessage: eligibilityMessage,
       cancellationDate: cancellationDate,
       cancellationReason: cancellationReason,
       applicationSubmittedAt: applicationSubmittedAt,
@@ -196,6 +203,7 @@ class ProgramDetailViewModel extends _$ProgramDetailViewModel {
 
   Future<void> _fetchProgramDetail() async {
     final requestVersion = ++_detailRequestVersion;
+    if (!ref.mounted) return;
     final id = int.tryParse(programId);
     if (id == null) {
       state = const ProgramDetailViewState(
@@ -228,13 +236,6 @@ class ProgramDetailViewModel extends _$ProgramDetailViewModel {
       if (error.statusCode == 404 || error.code == 'PROGRAM_NOT_FOUND') {
         state = const ProgramDetailViewState(
           screenStatus: ProgramDetailScreenStatus.notFound,
-        );
-        return;
-      }
-      if (error.statusCode == 410 || error.code == 'PROGRAM_DELETED') {
-        state = ProgramDetailViewState(
-          screenStatus: ProgramDetailScreenStatus.deleted,
-          detail: ProgramDetail.deletedFallback(programId),
         );
         return;
       }
@@ -355,6 +356,8 @@ ProgramDetailActionStatus programDetailActionStatusFrom(
     'PROGRAM_NOT_PUBLISHED' => ProgramDetailActionStatus.upcoming,
     'PROGRAM_FULL' => ProgramDetailActionStatus.full,
     'PROGRAM_CLOSED' => ProgramDetailActionStatus.closed,
+    'NOT_ENROLLED' ||
+    'NOT_TARGET_GRADE' => ProgramDetailActionStatus.ineligible,
     _ => switch (response.status) {
       'DRAFT' => ProgramDetailActionStatus.upcoming,
       'CLOSED' => ProgramDetailActionStatus.closed,
@@ -425,6 +428,11 @@ String _fullDateLabel(DateTime value) {
 String _timeLabel(DateTime value) {
   return '${value.hour.toString().padLeft(2, '0')}:'
       '${value.minute.toString().padLeft(2, '0')}';
+}
+
+String _dateTimeOrFallback(DateTime? value) {
+  if (value == null) return '확인 불가';
+  return '${_fullDateLabel(value)} ${_timeLabel(value)}';
 }
 
 bool _isSameDate(DateTime a, DateTime b) {

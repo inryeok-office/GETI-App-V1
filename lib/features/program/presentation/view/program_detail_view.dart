@@ -169,6 +169,7 @@ class ProgramDetailBody extends StatelessWidget {
         ),
         ProgramDetailAction(
           status: detail.actionStatus,
+          eligibilityMessage: detail.eligibilityMessage,
           onApply: onApply,
           onCancel: onCancel,
         ),
@@ -180,11 +181,13 @@ class ProgramDetailBody extends StatelessWidget {
 class ProgramDetailAction extends StatelessWidget {
   const ProgramDetailAction({
     required this.status,
+    this.eligibilityMessage,
     this.onApply,
     this.onCancel,
     super.key,
   });
   final ProgramDetailActionStatus status;
+  final String? eligibilityMessage;
   final VoidCallback? onApply;
   final VoidCallback? onCancel;
 
@@ -200,13 +203,19 @@ class ProgramDetailAction extends StatelessWidget {
         status == ProgramDetailActionStatus.cancelled ||
         status == ProgramDetailActionStatus.cancelFailure;
     final isFilledAction = showsPrimaryAction || showsCancelAction;
+    final serverMessage = eligibilityMessage?.trim();
+    String disabledLabel(String fallback) =>
+        serverMessage == null || serverMessage.isEmpty
+        ? fallback
+        : serverMessage;
     final label = switch (status) {
       ProgramDetailActionStatus.available => '신청하기',
       ProgramDetailActionStatus.applying => '신청하기',
       ProgramDetailActionStatus.concurrencyFailure => '신청하기',
-      ProgramDetailActionStatus.upcoming => '모집 전입니다.',
-      ProgramDetailActionStatus.full => '정원이 마감되었습니다.',
-      ProgramDetailActionStatus.closed => '신청 기간이 종료되었습니다.',
+      ProgramDetailActionStatus.upcoming => disabledLabel('모집 전입니다.'),
+      ProgramDetailActionStatus.full => disabledLabel('정원이 마감되었습니다.'),
+      ProgramDetailActionStatus.closed => disabledLabel('신청 기간이 종료되었습니다.'),
+      ProgramDetailActionStatus.ineligible => disabledLabel('신청할 수 없습니다.'),
       ProgramDetailActionStatus.applied => '신청 취소',
       ProgramDetailActionStatus.cancelling => '신청 취소',
       ProgramDetailActionStatus.cancelled => '신청 취소 완료',

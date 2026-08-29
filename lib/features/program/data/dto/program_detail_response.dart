@@ -48,6 +48,9 @@ class ProgramDetailResponse {
     this.endAt,
     this.applicationStartAt,
     this.applicationEndAt,
+    this.applicationSubmittedAt,
+    this.applicationCancelledAt,
+    this.programDeletedAt,
     this.capacity,
     this.remainingCapacity,
     this.vacancySubscriptionStatus,
@@ -72,6 +75,15 @@ class ProgramDetailResponse {
       ),
       applicationEndAt: DateTime.tryParse(
         json['applicationEndAt'] as String? ?? '',
+      ),
+      applicationSubmittedAt: DateTime.tryParse(
+        json['applicationSubmittedAt'] as String? ?? '',
+      ),
+      applicationCancelledAt: DateTime.tryParse(
+        json['applicationCancelledAt'] as String? ?? '',
+      ),
+      programDeletedAt: DateTime.tryParse(
+        json['programDeletedAt'] as String? ?? '',
       ),
       capacity: json['capacity'] as int?,
       currentApplicants: json['currentApplicants'] as int? ?? 0,
@@ -110,6 +122,9 @@ class ProgramDetailResponse {
   final DateTime? endAt;
   final DateTime? applicationStartAt;
   final DateTime? applicationEndAt;
+  final DateTime? applicationSubmittedAt;
+  final DateTime? applicationCancelledAt;
+  final DateTime? programDeletedAt;
   final int? capacity;
   final int currentApplicants;
   final int? remainingCapacity;
