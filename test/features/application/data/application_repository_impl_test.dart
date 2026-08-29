@@ -1,5 +1,7 @@
+import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:geti_app/core/network/rest_client.dart';
+import 'package:geti_app/features/application/data/dto/job_application_detail_response_dto.dart';
 import 'package:geti_app/features/application/data/dto/my_job_application_list_response_dto.dart';
 import 'package:geti_app/features/application/data/repository/application_repository_impl.dart';
 import 'package:geti_app/features/application/domain/model/application_summary.dart';
@@ -94,13 +96,128 @@ void main() {
     expect(application.job!.companyName, isNull);
     expect(application.job!.isDeleted, isTrue);
   });
+
+  test('Swagger 상세 응답의 answers, files, nullable 날짜를 역직렬화한다', () {
+    final response = JobApplicationDetailApiResponseDto.fromJson({
+      'success': true,
+      'data': {
+        'applicationId': 62,
+        'jobId': 101,
+        'jobTitle': 'Flutter Developer',
+        'companyName': 'GETI',
+        'status': 'REVISION_REQUESTED',
+        'statusReason': null,
+        'answers': [
+          {
+            'fieldId': 'skills',
+            'value': ['Flutter', 'Dart'],
+            'fileIds': null,
+          },
+        ],
+        'files': [
+          {
+            'fileId': 10,
+            'originalName': 'portfolio.pdf',
+            'contentType': 'application/pdf',
+            'size': 1887437,
+            'downloadUrl': 'https://example.com/portfolio.pdf',
+          },
+        ],
+        'submittedAt': null,
+        'withdrawnAt': null,
+        'createdAt': '2026-08-01T00:00:00Z',
+        'updatedAt': '2026-08-02T00:00:00Z',
+        'availableActions': ['RESUBMIT', 'WITHDRAW'],
+        'questions': [
+          {
+            'fieldId': 'skills',
+            'type': 'MULTI_SELECT',
+            'title': '기술 스택',
+            'required': true,
+            'order': 2,
+          },
+        ],
+      },
+      'meta': {'requestId': null},
+    });
+
+    final detail = response.data!;
+    expect(detail.status, JobApplicationStatusDto.revisionRequested);
+    expect(detail.statusReason, isNull);
+    expect(detail.answers.single.value, ['Flutter', 'Dart']);
+    expect(detail.files.single.originalName, 'portfolio.pdf');
+    expect(detail.submittedAt, isNull);
+    expect(detail.withdrawnAt, isNull);
+    expect(detail.questions.single.type, FormFieldTypeDto.multiSelect);
+  });
+
+  test('상세 응답의 알 수 없는 enum은 null로 파싱된다', () {
+    final response = JobApplicationDetailApiResponseDto.fromJson({
+      'success': true,
+      'data': {'applicationId': 62, 'status': 'FUTURE_STATUS'},
+    });
+
+    expect(response.data!.status, isNull);
+  });
+
+  test('실제 applicationId로 상세를 조회하고 DTO 전체를 domain에 보존한다', () async {
+    final client = _FakeRestClient(const {}, detailResponse: _detailResponse());
+    final detail = await ApplicationRepositoryImpl(
+      client,
+    ).getApplicationDetail(62);
+
+    expect(client.requestedDetailIds, [62]);
+    expect(detail, isNotNull);
+    expect(detail!.applicationId, 62);
+    expect(detail.status, ApplicationStatus.revisionRequested);
+    expect(
+      detail.statusReason,
+      'Please describe your project experience in detail.',
+    );
+    expect(detail.answers.single.fieldId, 'motivation');
+    expect(detail.files.single.downloadUrl, contains('portfolio.pdf'));
+    expect(detail.availableActions, ['RESUBMIT', 'WITHDRAW']);
+    expect(detail.questions.single.title, 'Motivation');
+  });
+
+  test('상세 조회 404는 지원 내역 없음 처리를 위해 null을 반환한다', () async {
+    final requestOptions = RequestOptions(path: '/api/v1/job-applications/999');
+    final client = _FakeRestClient(
+      const {},
+      detailError: DioException(
+        requestOptions: requestOptions,
+        response: Response<void>(
+          requestOptions: requestOptions,
+          statusCode: 404,
+        ),
+      ),
+    );
+
+    expect(
+      await ApplicationRepositoryImpl(client).getApplicationDetail(999),
+      isNull,
+    );
+  });
 }
 
 class _FakeRestClient implements RestClient {
-  _FakeRestClient(this.pages);
+  _FakeRestClient(this.pages, {this.detailResponse, this.detailError});
 
   final Map<int, MyJobApplicationListApiResponseDto> pages;
+  final JobApplicationDetailApiResponseDto? detailResponse;
+  final Object? detailError;
   final List<int> requestedPages = [];
+  final List<int> requestedDetailIds = [];
+
+  @override
+  Future<JobApplicationDetailApiResponseDto> getJobApplicationDetail(
+    int applicationId,
+  ) async {
+    requestedDetailIds.add(applicationId);
+    final currentError = detailError;
+    if (currentError != null) throw currentError;
+    return detailResponse!;
+  }
 
   @override
   Future<MyJobApplicationListApiResponseDto> getMyJobApplications({
@@ -179,5 +296,66 @@ MyJobApplicationJobSummaryDto _job({
     bookmarked: false,
     techStacks: const [],
     bookmarkCount: 0,
+  );
+}
+
+JobApplicationDetailApiResponseDto _detailResponse() {
+  return JobApplicationDetailApiResponseDto(
+    success: true,
+    data: JobApplicationDetailResponseDto(
+      applicationId: 62,
+      jobId: 101,
+      jobTitle: 'Flutter Developer',
+      companyName: 'GETI',
+      managerMemberId: 7,
+      managerName: 'Manager',
+      formId: 20,
+      formVersion: 1,
+      status: JobApplicationStatusDto.revisionRequested,
+      statusReason: 'Please describe your project experience in detail.',
+      contactEmail: 'student@example.com',
+      contactPhone: null,
+      privacyConsent: true,
+      applicantName: 'Student',
+      applicantCohort: 1,
+      applicantDepartment: 'Computer Science',
+      applicantMajors: const ['Computer Science'],
+      applicantDesiredJob: 'Frontend Developer',
+      applicantTechStacks: const ['Flutter', 'Dart'],
+      answers: const [
+        ApplicationAnswerDto(
+          fieldId: 'motivation',
+          value: 'I want to solve user problems.',
+          fileIds: null,
+        ),
+      ],
+      files: const [
+        JobApplicationFileResponseDto(
+          fileId: 30,
+          originalName: 'portfolio.pdf',
+          contentType: 'application/pdf',
+          size: 1887437,
+          downloadUrl: 'https://example.com/portfolio.pdf',
+        ),
+      ],
+      submittedAt: null,
+      withdrawnAt: null,
+      createdAt: DateTime(2026, 8, 1),
+      updatedAt: DateTime(2026, 8, 2),
+      availableActions: const ['RESUBMIT', 'WITHDRAW'],
+      questions: const [
+        FormFieldResponseDto(
+          fieldId: 'motivation',
+          type: FormFieldTypeDto.textarea,
+          title: 'Motivation',
+          description: null,
+          isRequired: true,
+          order: 1,
+          options: null,
+          filePolicy: null,
+        ),
+      ],
+    ),
+    meta: const ApiResponseMetaDto(requestId: null),
   );
 }
