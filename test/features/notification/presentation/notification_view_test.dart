@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:geti_app/features/notification/data/repository/notification_repository_impl.dart';
+import 'package:geti_app/features/notification/domain/model/notification_summary.dart';
+import 'package:geti_app/features/notification/domain/repository/notification_repository.dart';
 import 'package:geti_app/features/notification/presentation/view/notification_view.dart';
 import 'package:geti_app/features/notification/presentation/view_model/notification_view_model.dart';
 import 'package:geti_app/features/notification/presentation/widgets/notification_card.dart';
@@ -37,7 +40,7 @@ void main() {
     await _pumpNotificationView(tester);
 
     await tester.tap(find.byKey(const ValueKey('notification-filter-unread')));
-    await tester.pump();
+    await tester.pumpAndSettle();
 
     expect(find.byType(NotificationCard), findsNWidgets(2));
     expect(find.text('지원 상태가 변경되었습니다.'), findsOneWidget);
@@ -46,7 +49,7 @@ void main() {
   });
 
   testWidgets('읽음과 읽지 않음 카드 상태를 구분한다', (tester) async {
-    await _pumpBody(tester, const NotificationViewState());
+    await _pumpBody(tester, _notificationUiState);
 
     final unreadCard = tester.widget<NotificationCard>(
       find.byKey(const ValueKey('notification-card-application-status')),
@@ -63,21 +66,24 @@ void main() {
     );
   });
 
-  testWidgets('전체 읽음 Action 후 읽지 않음 없음 상태를 표시한다', (tester) async {
+  testWidgets('전체 읽음 Action은 기존 로컬 카드 상태를 갱신한다', (tester) async {
     await _pumpNotificationView(tester);
 
     await tester.tap(find.byKey(const ValueKey('notification-mark-all-read')));
     await tester.pump();
     expect(find.text('읽지 않은 알림 0개'), findsOneWidget);
-
-    await tester.tap(find.byKey(const ValueKey('notification-filter-unread')));
-    await tester.pump();
-    expect(find.text('읽지 않은 알림이 없어요'), findsOneWidget);
-    expect(find.text('모든 알림을 확인했어요.'), findsOneWidget);
+    expect(find.byKey(const ValueKey('notification-unread-1')), findsNothing);
+    expect(find.byKey(const ValueKey('notification-unread-2')), findsNothing);
   });
 
   testWidgets('전체 알림 없음 상태를 표시한다', (tester) async {
-    await _pumpBody(tester, const NotificationViewState(notifications: []));
+    await _pumpBody(
+      tester,
+      const NotificationViewState(
+        screenStatus: NotificationScreenStatus.loaded,
+        notifications: [],
+      ),
+    );
 
     expect(find.text('알림이 없어요'), findsOneWidget);
     expect(find.text('새로운 알림이 도착하면 여기에 표시됩니다.'), findsOneWidget);
@@ -87,16 +93,9 @@ void main() {
     await _pumpBody(
       tester,
       const NotificationViewState(
+        screenStatus: NotificationScreenStatus.loaded,
         selectedFilter: NotificationFilter.unread,
-        notifications: [
-          NotificationItem(
-            id: 'read',
-            title: '포트폴리오 제출 요청',
-            description: '2026 상반기 포트폴리오 제출 요청이 도착했습니다.',
-            time: '2일 전',
-            isRead: true,
-          ),
-        ],
+        notifications: [],
       ),
     );
 
@@ -205,6 +204,8 @@ void main() {
     tester,
   ) async {
     const initialState = NotificationViewState(
+      screenStatus: NotificationScreenStatus.loaded,
+      unreadCount: 1,
       notifications: [
         NotificationItem(
           id: 'unread-general-target',
@@ -248,6 +249,8 @@ void main() {
 
   testWidgets('삭제된 대상 알림은 읽음 처리 후 삭제 상태 화면으로 이동한다', (tester) async {
     const initialState = NotificationViewState(
+      screenStatus: NotificationScreenStatus.loaded,
+      unreadCount: 1,
       notifications: [
         NotificationItem(
           id: 'unread-deleted-target',
@@ -284,6 +287,8 @@ void main() {
 
   testWidgets('접근할 수 없는 대상 알림은 읽음 처리 후 권한 없음 화면으로 이동한다', (tester) async {
     const initialState = NotificationViewState(
+      screenStatus: NotificationScreenStatus.loaded,
+      unreadCount: 1,
       notifications: [
         NotificationItem(
           id: 'unread-forbidden-target',
@@ -375,14 +380,19 @@ GoRouter _notificationRouter() {
 Future<void> _pumpNotificationView(WidgetTester tester) async {
   await _setViewport(tester);
   await tester.pumpWidget(
-    const ProviderScope(
-      child: ScreenUtilInit(
+    ProviderScope(
+      overrides: [
+        notificationRepositoryProvider.overrideWithValue(
+          _fixtureNotificationRepository,
+        ),
+      ],
+      child: const ScreenUtilInit(
         designSize: Size(390, 844),
         child: MaterialApp(home: NotificationView()),
       ),
     ),
   );
-  await tester.pump();
+  await tester.pumpAndSettle();
 }
 
 Future<void> _pumpBody(
@@ -445,7 +455,14 @@ Future<void> _pumpRouter(
   );
   await tester.pumpWidget(
     container == null
-        ? ProviderScope(child: child)
+        ? ProviderScope(
+            overrides: [
+              notificationRepositoryProvider.overrideWithValue(
+                _fixtureNotificationRepository,
+              ),
+            ],
+            child: child,
+          )
         : UncontrolledProviderScope(container: container, child: child),
   );
   await tester.pump();
@@ -465,4 +482,109 @@ class _SeededNotificationViewModel extends NotificationViewModel {
 
   @override
   NotificationViewState build() => initialState;
+}
+
+const _notificationUiState = NotificationViewState(
+  screenStatus: NotificationScreenStatus.loaded,
+  unreadCount: 2,
+  notifications: [
+    NotificationItem(
+      id: 'application-status',
+      title: '지원 상태가 변경되었습니다.',
+      description: '토스페이먼츠 지원서가 검토 중으로 변경되었습니다.',
+      time: '방금',
+      isRead: false,
+    ),
+    NotificationItem(
+      id: 'program-applied',
+      title: '프로그램 신청이 완료되었습니다.',
+      description: '프론트엔드 특강 신청이 완료되었습니다.',
+      time: '어제',
+      isRead: true,
+    ),
+  ],
+);
+
+final NotificationRepository _fixtureNotificationRepository =
+    _FakeNotificationRepository(
+      NotificationListResult(
+        unreadCount: 2,
+        notifications: [
+          _notification(
+            id: 1,
+            title: '지원 상태가 변경되었습니다.',
+            content: '토스페이먼츠 지원서가 검토 중으로 변경되었습니다.',
+            createdAt: DateTime.now(),
+          ),
+          _notification(
+            id: 2,
+            title: '새로운 맞춤 공고가 도착했습니다.',
+            content: '기술 스택과 잘 맞는 공고 3개를 확인해 보세요.',
+            createdAt: DateTime.now().subtract(const Duration(hours: 1)),
+          ),
+          _notification(
+            id: 3,
+            title: '프로그램 신청이 완료되었습니다.',
+            content: '프론트엔드 특강 신청이 완료되었습니다.',
+            createdAt: DateTime.now().subtract(const Duration(days: 1)),
+            isRead: true,
+            targetAvailable: false,
+            unavailableReason: NotificationUnavailableReason.deleted,
+          ),
+          _notification(
+            id: 4,
+            title: '포트폴리오 제출 요청',
+            content: '2026 상반기 포트폴리오 제출 요청이 도착했습니다.',
+            createdAt: DateTime.now().subtract(const Duration(days: 2)),
+            isRead: true,
+            targetAvailable: false,
+            unavailableReason: NotificationUnavailableReason.forbidden,
+          ),
+        ],
+      ),
+    );
+
+class _FakeNotificationRepository implements NotificationRepository {
+  const _FakeNotificationRepository(this.result);
+
+  final NotificationListResult result;
+
+  @override
+  Future<NotificationListResult> getNotifications({
+    required bool unreadOnly,
+  }) async {
+    return NotificationListResult(
+      notifications: unreadOnly
+          ? result.notifications
+                .where((notification) => !notification.isRead)
+                .toList(growable: false)
+          : result.notifications,
+      unreadCount: result.unreadCount,
+    );
+  }
+}
+
+NotificationSummary _notification({
+  required int id,
+  required String title,
+  required String content,
+  required DateTime createdAt,
+  bool isRead = false,
+  bool targetAvailable = true,
+  NotificationUnavailableReason? unavailableReason,
+}) {
+  return NotificationSummary(
+    notificationId: id,
+    notificationType: NotificationType.system,
+    title: title,
+    content: content,
+    targetType: null,
+    targetId: null,
+    targetAvailable: targetAvailable,
+    targetUnavailableReason: unavailableReason,
+    deepLink: null,
+    isRead: isRead,
+    readAt: null,
+    createdAt: createdAt,
+  );
 }
