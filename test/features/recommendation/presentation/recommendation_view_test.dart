@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:geti_app/core/network/rest_client.dart';
+import 'package:geti_app/features/recommendation/data/dto/recommendation_list_response.dart';
+import 'package:geti_app/features/recommendation/data/recommendation_repository.dart';
 import 'package:geti_app/features/recommendation/presentation/view/recommendation_view.dart';
 import 'package:geti_app/features/recommendation/presentation/view_model/recommendation_view_model.dart';
 import 'package:geti_app/features/recommendation/presentation/view_model/suitability_level.dart';
@@ -24,10 +27,24 @@ void main() {
       '적합',
       '매우 적합',
     ]);
+    expect(
+      suitabilityLevelFromApi('VERY_UNSUITABLE'),
+      SuitabilityLevel.veryUnsuitable,
+    );
+    expect(suitabilityLevelFromApi('UNSUITABLE'), SuitabilityLevel.unsuitable);
+    expect(suitabilityLevelFromApi('NORMAL'), SuitabilityLevel.normal);
+    expect(
+      suitabilityLevelFromApi('RECOMMENDED'),
+      SuitabilityLevel.recommended,
+    );
+    expect(
+      suitabilityLevelFromApi('HIGHLY_RECOMMENDED'),
+      SuitabilityLevel.highlyRecommended,
+    );
   });
 
   test('추천 생성 액션은 생성 중 상태로 전환한다', () {
-    final container = ProviderContainer();
+    final container = _containerFor(status: 'EMPTY');
     addTearDown(container.dispose);
 
     container.read(recommendationViewModelProvider.notifier).startGeneration();
@@ -35,6 +52,70 @@ void main() {
     expect(
       container.read(recommendationViewModelProvider).status,
       RecommendationStatus.generating,
+    );
+  });
+
+  test('서버 status는 content 비어 있음 여부가 아니라 status 값으로 매핑한다', () async {
+    final cases = {
+      'DISABLED': RecommendationStatus.disabled,
+      'GENERATING': RecommendationStatus.generating,
+      'FAILED': RecommendationStatus.failure,
+      'EMPTY': RecommendationStatus.empty,
+      'READY': RecommendationStatus.loaded,
+    };
+
+    for (final entry in cases.entries) {
+      final container = _containerFor(status: entry.key);
+      addTearDown(container.dispose);
+
+      await container.read(recommendationViewModelProvider.notifier).retry();
+      final state = container.read(recommendationViewModelProvider);
+
+      expect(state.status, entry.value);
+      expect(state.serverStatus, entry.key);
+      expect(state.page, 0);
+      expect(state.size, 20);
+      expect(state.first, isTrue);
+      expect(state.last, isTrue);
+    }
+  });
+
+  test(
+    'READY response maps to existing recommendation card model safely',
+    () async {
+      final container = _containerFor(
+        status: 'READY',
+        content: [_recommendationItem()],
+      );
+      addTearDown(container.dispose);
+
+      await container.read(recommendationViewModelProvider.notifier).retry();
+      final state = container.read(recommendationViewModelProvider);
+      final job = state.jobs.single;
+
+      expect(state.status, RecommendationStatus.loaded);
+      expect(job.companyName, 'GETI');
+      expect(job.positionName, 'Backend Engineer');
+      expect(job.summary, isNull);
+      expect(job.matchReason, isNull);
+      expect(job.tags, ['Dart', 'Flutter']);
+      expect(job.availability, RecommendationJobAvailability.active);
+      expect(job.suitabilityLevel, SuitabilityLevel.highlyRecommended);
+      expect(state.bookmarkedJobs.contains(job), isTrue);
+      expect(state.totalElements, 1);
+      expect(state.totalPages, 1);
+    },
+  );
+
+  test('API error maps to existing failure state', () async {
+    final container = _containerForError();
+    addTearDown(container.dispose);
+
+    await container.read(recommendationViewModelProvider.notifier).retry();
+
+    expect(
+      container.read(recommendationViewModelProvider).status,
+      RecommendationStatus.failure,
     );
   });
 
@@ -164,6 +245,110 @@ void main() {
     expect(find.text('보통'), findsNothing);
     expect(tester.takeException(), isNull);
   });
+}
+
+ProviderContainer _containerFor({
+  required String status,
+  List<RecommendationItemResponse> content = const [],
+}) {
+  return ProviderContainer(
+    overrides: [
+      recommendationRepositoryProvider.overrideWithValue(
+        RecommendationRepository(
+          _FakeRestClient(
+            response: ApiResponseRecommendationListResponse(
+              success: true,
+              data: _recommendationList(status: status, content: content),
+            ),
+          ),
+        ),
+      ),
+    ],
+  );
+}
+
+ProviderContainer _containerForError() {
+  return ProviderContainer(
+    overrides: [
+      recommendationRepositoryProvider.overrideWithValue(
+        RecommendationRepository(_FakeRestClient(error: Exception('network'))),
+      ),
+    ],
+  );
+}
+
+RecommendationListResponse _recommendationList({
+  required String status,
+  required List<RecommendationItemResponse> content,
+}) {
+  return RecommendationListResponse(
+    enabled: status != 'DISABLED',
+    status: status,
+    generatedAt: null,
+    nextGenerationAt: null,
+    content: content,
+    page: 0,
+    size: 20,
+    totalElements: content.length,
+    totalPages: content.isEmpty ? 0 : 1,
+    first: true,
+    last: true,
+  );
+}
+
+RecommendationItemResponse _recommendationItem() {
+  return RecommendationItemResponse(
+    recommendationId: 1,
+    job: const RecommendationJobResponse(
+      jobId: 10,
+      title: 'Backend Engineer',
+      postingType: 'GENERAL',
+      applicationMethod: 'INTERNAL',
+      status: 'PUBLISHED',
+      company: RecommendationCompanySummaryResponse(
+        companyId: 1,
+        name: 'GETI',
+        logoUrl: null,
+      ),
+      endDate: null,
+      viewCount: 12,
+      bookmarked: true,
+      techStacks: [
+        RecommendationTechStackResponse(techStackId: 1, name: 'Dart'),
+        RecommendationTechStackResponse(techStackId: 2, name: 'Flutter'),
+      ],
+      bookmarkCount: 3,
+    ),
+    score: 93,
+    suitabilityLevel: 'HIGHLY_RECOMMENDED',
+    rank: 1,
+    reasons: const [
+      RecommendationReasonResponse(
+        type: 'REQUIRED_SKILL_MATCH',
+        matchedCount: 2,
+        totalCount: 3,
+      ),
+    ],
+    generatedAt: DateTime.utc(2026, 9, 2, 9),
+  );
+}
+
+class _FakeRestClient implements RestClient {
+  _FakeRestClient({this.response, this.error});
+
+  final ApiResponseRecommendationListResponse? response;
+  final Object? error;
+
+  @override
+  Future<ApiResponseRecommendationListResponse> getMyRecommendations({
+    String? suitabilityLevel,
+    int page = 0,
+    int size = 20,
+  }) async {
+    final error = this.error;
+    if (error != null) throw error;
+    return response!;
+  }
 }
 
 Future<void> _pumpState(

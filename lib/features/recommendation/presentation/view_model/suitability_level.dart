@@ -6,6 +6,15 @@ enum SuitabilityLevel {
   highlyRecommended,
 }
 
+SuitabilityLevel? suitabilityLevelFromApi(String raw) => switch (raw) {
+  'VERY_UNSUITABLE' => SuitabilityLevel.veryUnsuitable,
+  'UNSUITABLE' => SuitabilityLevel.unsuitable,
+  'NORMAL' => SuitabilityLevel.normal,
+  'RECOMMENDED' => SuitabilityLevel.recommended,
+  'HIGHLY_RECOMMENDED' => SuitabilityLevel.highlyRecommended,
+  _ => null,
+};
+
 extension SuitabilityLevelFigmaLabel on SuitabilityLevel {
   String? get figmaLabel => switch (this) {
     SuitabilityLevel.veryUnsuitable => null,

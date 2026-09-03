@@ -3,6 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:geti_app/app/app.dart';
+import 'package:geti_app/core/network/rest_client.dart';
+import 'package:geti_app/features/recommendation/data/dto/recommendation_list_response.dart';
+import 'package:geti_app/features/recommendation/data/recommendation_repository.dart';
 import 'package:geti_app/features/recommendation/presentation/view_model/recommendation_view_model.dart';
 import 'package:geti_app/features/recommendation/presentation/view_model/suitability_level.dart';
 import 'package:geti_app/features/recommendation/presentation/widgets/recommendation_uninterested_bottom_sheet.dart';
@@ -16,7 +19,7 @@ void main() {
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
 
-    await tester.pumpWidget(const ProviderScope(child: GetiApp()));
+    await _pumpGetiApp(tester);
     await tester.pumpAndSettle();
     await _loginAndSettle(tester);
 
@@ -37,7 +40,7 @@ void main() {
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
 
-    await tester.pumpWidget(const ProviderScope(child: GetiApp()));
+    await _pumpGetiApp(tester);
     await tester.pumpAndSettle();
     await _loginAndSettle(tester);
 
@@ -62,13 +65,15 @@ void main() {
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
 
-    final container = ProviderContainer();
+    final container = ProviderContainer(overrides: [_recommendationOverride()]);
     addTearDown(container.dispose);
     final subscription = container.listen(
       recommendationViewModelProvider,
       (_, _) {},
+      fireImmediately: true,
     );
     addTearDown(subscription.close);
+    await container.read(recommendationViewModelProvider.notifier).retry();
 
     final job = container.read(recommendationViewModelProvider).jobs.first;
     container
@@ -179,14 +184,16 @@ void main() {
   });
 
   test('현재 공고 설정은 처리 중을 거쳐 완료 상태로 전환한다', () async {
-    final container = ProviderContainer();
+    final container = ProviderContainer(overrides: [_recommendationOverride()]);
     addTearDown(container.dispose);
     final subscription = container.listen(
       recommendationViewModelProvider,
       (previous, next) {},
+      fireImmediately: true,
     );
     addTearDown(subscription.close);
     final viewModel = container.read(recommendationViewModelProvider.notifier);
+    await viewModel.retry();
     final job = container.read(recommendationViewModelProvider).jobs.first;
 
     viewModel.openUninterested(job);
@@ -210,6 +217,92 @@ void main() {
       isFalse,
     );
   });
+}
+
+Future<void> _pumpGetiApp(WidgetTester tester) {
+  return tester.pumpWidget(
+    ProviderScope(
+      overrides: [_recommendationOverride()],
+      child: const GetiApp(),
+    ),
+  );
+}
+
+dynamic _recommendationOverride() {
+  return recommendationRepositoryProvider.overrideWithValue(
+    RecommendationRepository(
+      _FakeRestClient(
+        response: ApiResponseRecommendationListResponse(
+          success: true,
+          data: RecommendationListResponse(
+            enabled: true,
+            status: 'READY',
+            generatedAt: null,
+            nextGenerationAt: null,
+            content: [_recommendationItem()],
+            page: 0,
+            size: 20,
+            totalElements: 1,
+            totalPages: 1,
+            first: true,
+            last: true,
+          ),
+        ),
+      ),
+    ),
+  );
+}
+
+RecommendationItemResponse _recommendationItem() {
+  return RecommendationItemResponse(
+    recommendationId: 1,
+    job: const RecommendationJobResponse(
+      jobId: 10,
+      title: 'Cloud Platform Engineer',
+      postingType: 'GENERAL',
+      applicationMethod: 'INTERNAL',
+      status: 'PUBLISHED',
+      company: RecommendationCompanySummaryResponse(
+        companyId: 1,
+        name: '네이버클라우드',
+        logoUrl: null,
+      ),
+      endDate: null,
+      viewCount: 12,
+      bookmarked: false,
+      techStacks: [
+        RecommendationTechStackResponse(techStackId: 1, name: 'React'),
+        RecommendationTechStackResponse(techStackId: 2, name: 'TypeScript'),
+      ],
+      bookmarkCount: 3,
+    ),
+    score: 93,
+    suitabilityLevel: 'HIGHLY_RECOMMENDED',
+    rank: 1,
+    reasons: const [
+      RecommendationReasonResponse(
+        type: 'REQUIRED_SKILL_MATCH',
+        matchedCount: 2,
+        totalCount: 3,
+      ),
+    ],
+    generatedAt: DateTime.utc(2026, 9, 2, 9),
+  );
+}
+
+class _FakeRestClient implements RestClient {
+  const _FakeRestClient({required this.response});
+
+  final ApiResponseRecommendationListResponse response;
+
+  @override
+  Future<ApiResponseRecommendationListResponse> getMyRecommendations({
+    String? suitabilityLevel,
+    int page = 0,
+    int size = 20,
+  }) async {
+    return response;
+  }
 }
 
 Future<void> _loginAndSettle(WidgetTester tester) async {

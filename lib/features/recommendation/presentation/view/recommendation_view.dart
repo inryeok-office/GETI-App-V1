@@ -49,7 +49,7 @@ class _RecommendationViewState extends ConsumerState<RecommendationView> {
                   child: RecommendationScreenBody(
                     state: state,
                     onGenerate: viewModel.startGeneration,
-                    onRetry: viewModel.startGeneration,
+                    onRetry: viewModel.retry,
                     onUninterested: _showUninterestedSheet,
                     onBookmark: viewModel.toggleBookmark,
                   ),
@@ -143,6 +143,10 @@ class RecommendationScreenBody extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (state.status == RecommendationStatus.disabled) {
+      return const SizedBox.shrink();
+    }
+
     if (state.status != RecommendationStatus.loaded) {
       return RecommendationStateContent(
         status: state.status,
