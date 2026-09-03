@@ -1,5 +1,7 @@
 import 'dart:async';
 
+import 'package:geti_app/features/recommendation/data/dto/recommendation_list_response.dart';
+import 'package:geti_app/features/recommendation/data/recommendation_repository.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import 'suitability_level.dart';
@@ -12,6 +14,7 @@ enum RecommendationStatus {
   beforeGeneration,
   generating,
   failure,
+  disabled,
 }
 
 enum RecommendationJobAvailability { active, closed, unavailable }
@@ -33,16 +36,16 @@ class RecommendationJob {
   const RecommendationJob({
     required this.companyName,
     required this.positionName,
-    required this.summary,
     required this.tags,
     required this.availability,
+    this.summary,
     this.suitabilityLevel,
     this.matchReason,
   });
 
   final String companyName;
   final String positionName;
-  final String summary;
+  final String? summary;
   final List<String> tags;
   final RecommendationJobAvailability availability;
   final SuitabilityLevel? suitabilityLevel;
@@ -60,6 +63,16 @@ class RecommendationViewState {
     this.showUninterestedSuccess = false,
     this.isUnsetting = false,
     this.bookmarkedJobs = const {},
+    this.enabled,
+    this.serverStatus,
+    this.generatedAt,
+    this.nextGenerationAt,
+    this.page = 0,
+    this.size = 20,
+    this.totalElements = 0,
+    this.totalPages = 0,
+    this.first = true,
+    this.last = true,
   });
 
   final RecommendationStatus status;
@@ -71,6 +84,16 @@ class RecommendationViewState {
   final bool showUninterestedSuccess;
   final bool isUnsetting;
   final Set<RecommendationJob> bookmarkedJobs;
+  final bool? enabled;
+  final String? serverStatus;
+  final DateTime? generatedAt;
+  final DateTime? nextGenerationAt;
+  final int page;
+  final int size;
+  final int totalElements;
+  final int totalPages;
+  final bool first;
+  final bool last;
 
   RecommendationViewState copyWith({
     RecommendationStatus? status,
@@ -82,6 +105,16 @@ class RecommendationViewState {
     bool? showUninterestedSuccess,
     bool? isUnsetting,
     Set<RecommendationJob>? bookmarkedJobs,
+    bool? enabled,
+    String? serverStatus,
+    DateTime? generatedAt,
+    DateTime? nextGenerationAt,
+    int? page,
+    int? size,
+    int? totalElements,
+    int? totalPages,
+    bool? first,
+    bool? last,
   }) {
     return RecommendationViewState(
       status: status ?? this.status,
@@ -95,19 +128,94 @@ class RecommendationViewState {
           showUninterestedSuccess ?? this.showUninterestedSuccess,
       isUnsetting: isUnsetting ?? this.isUnsetting,
       bookmarkedJobs: bookmarkedJobs ?? this.bookmarkedJobs,
+      enabled: enabled ?? this.enabled,
+      serverStatus: serverStatus ?? this.serverStatus,
+      generatedAt: generatedAt ?? this.generatedAt,
+      nextGenerationAt: nextGenerationAt ?? this.nextGenerationAt,
+      page: page ?? this.page,
+      size: size ?? this.size,
+      totalElements: totalElements ?? this.totalElements,
+      totalPages: totalPages ?? this.totalPages,
+      first: first ?? this.first,
+      last: last ?? this.last,
     );
   }
 }
 
+const _recommendationPage = 0;
+const _recommendationPageSize = 20;
+
 @riverpod
 class RecommendationViewModel extends _$RecommendationViewModel {
   int _successNoticeVersion = 0;
+  int _requestVersion = 0;
 
   @override
-  RecommendationViewState build() => const RecommendationViewState(
-    status: RecommendationStatus.loaded,
-    jobs: _mockJobs,
-  );
+  RecommendationViewState build() {
+    final requestVersion = _nextRequestVersion();
+    unawaited(
+      Future.microtask(
+        () => _fetchRecommendations(requestVersion: requestVersion),
+      ),
+    );
+    return const RecommendationViewState(
+      status: RecommendationStatus.generating,
+    );
+  }
+
+  Future<void> retry() {
+    return _fetchRecommendations(requestVersion: _nextRequestVersion());
+  }
+
+  int _nextRequestVersion() => ++_requestVersion;
+
+  Future<void> _fetchRecommendations({required int requestVersion}) async {
+    if (requestVersion != _requestVersion) return;
+    state = state.copyWith(
+      status: RecommendationStatus.generating,
+      jobs: const [],
+      bookmarkedJobs: const <RecommendationJob>{},
+    );
+
+    try {
+      final response = await ref
+          .read(recommendationRepositoryProvider)
+          .getMyRecommendations(
+            page: _recommendationPage,
+            size: _recommendationPageSize,
+          );
+      if (!ref.mounted || requestVersion != _requestVersion) return;
+
+      final jobs = response.status == 'READY'
+          ? response.content
+                .map(recommendationJobFromItem)
+                .toList(growable: false)
+          : const <RecommendationJob>[];
+      final bookmarkedJobs = <RecommendationJob>{
+        for (var i = 0; i < response.content.length && i < jobs.length; i++)
+          if (response.content[i].job.bookmarked) jobs[i],
+      };
+
+      state = state.copyWith(
+        status: recommendationStatusFromApi(response.status),
+        jobs: jobs,
+        bookmarkedJobs: bookmarkedJobs,
+        enabled: response.enabled,
+        serverStatus: response.status,
+        generatedAt: response.generatedAt,
+        nextGenerationAt: response.nextGenerationAt,
+        page: response.page,
+        size: response.size,
+        totalElements: response.totalElements,
+        totalPages: response.totalPages,
+        first: response.first,
+        last: response.last,
+      );
+    } catch (_) {
+      if (!ref.mounted || requestVersion != _requestVersion) return;
+      state = state.copyWith(status: RecommendationStatus.failure);
+    }
+  }
 
   void startGeneration() {
     state = const RecommendationViewState(
@@ -229,7 +337,45 @@ class RecommendationViewModel extends _$RecommendationViewModel {
   }
 }
 
-const _mockJobs = [
+RecommendationStatus recommendationStatusFromApi(String raw) => switch (raw) {
+  'DISABLED' => RecommendationStatus.disabled,
+  'GENERATING' => RecommendationStatus.generating,
+  'FAILED' => RecommendationStatus.failure,
+  'EMPTY' => RecommendationStatus.empty,
+  'READY' => RecommendationStatus.loaded,
+  _ => RecommendationStatus.failure,
+};
+
+RecommendationJob recommendationJobFromItem(RecommendationItemResponse item) {
+  final job = item.job;
+  return RecommendationJob(
+    companyName: _textOrFallback(job.company?.name, '기업명 미정'),
+    positionName: job.title,
+    summary: null,
+    tags: job.techStacks
+        .map((techStack) => techStack.name.trim())
+        .where((name) => name.isNotEmpty)
+        .toList(growable: false),
+    availability: recommendationJobAvailabilityFromApi(job.status),
+    suitabilityLevel: suitabilityLevelFromApi(item.suitabilityLevel),
+    matchReason: null,
+  );
+}
+
+RecommendationJobAvailability recommendationJobAvailabilityFromApi(
+  String raw,
+) => switch (raw) {
+  'CLOSED' => RecommendationJobAvailability.closed,
+  'DELETED' => RecommendationJobAvailability.unavailable,
+  _ => RecommendationJobAvailability.active,
+};
+
+String _textOrFallback(String? value, String fallback) {
+  final trimmed = value?.trim();
+  return trimmed == null || trimmed.isEmpty ? fallback : trimmed;
+}
+
+const mockRecommendationJobs = [
   RecommendationJob(
     companyName: '네이버클라우드',
     positionName: 'Cloud Platform Engineer',

@@ -25,6 +25,7 @@ class RecommendationJobCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final fitLabel = job.suitabilityLevel?.figmaLabel;
+    final summary = job.summary?.trim();
 
     return Container(
       width: double.infinity,
@@ -75,13 +76,19 @@ class RecommendationJobCard extends StatelessWidget {
             overflow: TextOverflow.ellipsis,
             style: AppTypography.heading3.copyWith(color: AppColors.neutral900),
           ),
-          SizedBox(height: 8.h),
-          Text(
-            job.summary,
-            style: AppTypography.caption.copyWith(color: AppColors.neutral600),
-          ),
-          SizedBox(height: 8.h),
-          _JobMessage(job: job),
+          if (summary != null && summary.isNotEmpty) ...[
+            SizedBox(height: 8.h),
+            Text(
+              summary,
+              style: AppTypography.caption.copyWith(
+                color: AppColors.neutral600,
+              ),
+            ),
+          ],
+          if (_shouldShowJobMessage(job)) ...[
+            SizedBox(height: 8.h),
+            _JobMessage(job: job),
+          ],
           if (job.tags.isNotEmpty) ...[
             SizedBox(height: 8.h),
             Wrap(
@@ -118,6 +125,13 @@ class RecommendationJobCard extends StatelessWidget {
       ),
     );
   }
+}
+
+bool _shouldShowJobMessage(RecommendationJob job) {
+  if (job.availability != RecommendationJobAvailability.active) {
+    return true;
+  }
+  return job.matchReason?.trim().isNotEmpty ?? false;
 }
 
 class _JobMessage extends StatelessWidget {
