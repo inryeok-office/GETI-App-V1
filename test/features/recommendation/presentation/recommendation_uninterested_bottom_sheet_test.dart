@@ -4,6 +4,7 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:geti_app/app/app.dart';
 import 'package:geti_app/core/network/rest_client.dart';
+import 'package:geti_app/features/recommendation/data/dto/recommendation_exclusion_list_response.dart';
 import 'package:geti_app/features/recommendation/data/dto/recommendation_list_response.dart';
 import 'package:geti_app/features/recommendation/data/recommendation_repository.dart';
 import 'package:geti_app/features/recommendation/presentation/view_model/recommendation_view_model.dart';
@@ -208,7 +209,7 @@ void main() {
 
     final state = container.read(recommendationViewModelProvider);
     expect(state.uninterestedSheetStatus, UninterestedSheetStatus.hidden);
-    expect(state.uninterestedJobs, contains(job));
+    expect(state.uninterestedJobIds, contains(job.jobId));
     expect(state.showUninterestedSuccess, isTrue);
 
     await Future<void>.delayed(const Duration(seconds: 1));
@@ -303,6 +304,27 @@ class _FakeRestClient implements RestClient {
   }) async {
     return response;
   }
+
+  @override
+  Future<ApiResponseRecommendationExclusionListResponse>
+  getRecommendationExclusions({
+    String? exclusionType,
+    int page = 0,
+    int size = 20,
+  }) async {
+    return const ApiResponseRecommendationExclusionListResponse(
+      success: true,
+      data: RecommendationExclusionListResponse(
+        content: [],
+        page: 0,
+        size: 20,
+        totalElements: 0,
+        totalPages: 0,
+        first: true,
+        last: true,
+      ),
+    );
+  }
 }
 
 Future<void> _loginAndSettle(WidgetTester tester) async {
@@ -312,6 +334,7 @@ Future<void> _loginAndSettle(WidgetTester tester) async {
 }
 
 const _job = RecommendationJob(
+  jobId: 10,
   companyName: '네이버클라우드',
   positionName: 'Cloud Platform Engineer',
   summary: '분당 · 정규직 · D-18',

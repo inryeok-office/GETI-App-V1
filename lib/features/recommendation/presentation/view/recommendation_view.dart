@@ -173,7 +173,7 @@ class RecommendationScreenBody extends StatelessWidget {
             final job = state.jobs[index - 1];
             return RecommendationJobCard(
               job: job,
-              isUninterested: state.uninterestedJobs.contains(job),
+              isUninterested: state.uninterestedJobIds.contains(job.jobId),
               isBookmarked: state.bookmarkedJobs.contains(job),
               onBookmarkTap: onBookmark == null ? null : () => onBookmark!(job),
               onUninterestedTap: onUninterested == null

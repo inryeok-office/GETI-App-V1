@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 import 'package:geti_app/core/network/rest_client.dart';
+import 'package:geti_app/features/recommendation/data/dto/recommendation_exclusion_list_response.dart';
 import 'package:geti_app/features/recommendation/data/dto/recommendation_list_response.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
@@ -48,6 +49,39 @@ class RecommendationRepository {
     } on Object catch (error) {
       throw RecommendationRepositoryException(
         'Failed to parse recommendations.',
+        cause: error,
+      );
+    }
+  }
+
+  Future<RecommendationExclusionListResponse> getRecommendationExclusions({
+    String? exclusionType,
+    int page = 0,
+    int size = 20,
+  }) async {
+    try {
+      final response = await _client.getRecommendationExclusions(
+        exclusionType: exclusionType,
+        page: page,
+        size: size,
+      );
+      final data = response.data;
+      if (!response.success || data == null) {
+        throw const RecommendationRepositoryException(
+          'Recommendation exclusion response does not contain data.',
+        );
+      }
+      return data;
+    } on RecommendationRepositoryException {
+      rethrow;
+    } on DioException catch (error) {
+      throw RecommendationRepositoryException(
+        'Failed to fetch recommendation exclusions.',
+        cause: error,
+      );
+    } on Object catch (error) {
+      throw RecommendationRepositoryException(
+        'Failed to parse recommendation exclusions.',
         cause: error,
       );
     }

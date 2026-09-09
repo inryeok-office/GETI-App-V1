@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:geti_app/core/network/rest_client.dart';
+import 'package:geti_app/features/recommendation/data/dto/recommendation_exclusion_list_response.dart';
 import 'package:geti_app/features/recommendation/data/dto/recommendation_list_response.dart';
 import 'package:geti_app/features/recommendation/data/recommendation_repository.dart';
 import 'package:geti_app/features/recommendation/presentation/view/recommendation_view.dart';
@@ -107,8 +108,52 @@ void main() {
     },
   );
 
+  test('관심 없음 목록을 jobId로 추천 카드 상태에 연결한다', () async {
+    final container = _containerFor(
+      status: 'READY',
+      content: [_recommendationItem()],
+      exclusions: [_recommendationExclusion(type: 'SIMILAR_JOBS')],
+    );
+    addTearDown(container.dispose);
+
+    await container.read(recommendationViewModelProvider.notifier).retry();
+    final state = container.read(recommendationViewModelProvider);
+    final job = state.jobs.single;
+
+    expect(state.uninterestedJobIds, {10});
+    expect(state.recommendationExclusions.single.exclusionId, 31);
+    expect(state.exclusionPage, 0);
+    expect(state.exclusionSize, 20);
+    expect(state.exclusionTotalElements, 1);
+    expect(state.exclusionTotalPages, 1);
+    expect(state.exclusionFirst, isTrue);
+    expect(state.exclusionLast, isTrue);
+
+    container
+        .read(recommendationViewModelProvider.notifier)
+        .openUninterested(job);
+    final updatedState = container.read(recommendationViewModelProvider);
+    expect(
+      updatedState.uninterestedSheetStatus,
+      UninterestedSheetStatus.unsetting,
+    );
+    expect(updatedState.uninterestedScope, UninterestedScope.similarJobs);
+  });
+
   test('API error maps to existing failure state', () async {
     final container = _containerForError();
+    addTearDown(container.dispose);
+
+    await container.read(recommendationViewModelProvider.notifier).retry();
+
+    expect(
+      container.read(recommendationViewModelProvider).status,
+      RecommendationStatus.failure,
+    );
+  });
+
+  test('관심 없음 목록 API error도 기존 failure 상태로 연결한다', () async {
+    final container = _containerForExclusionError();
     addTearDown(container.dispose);
 
     await container.read(recommendationViewModelProvider.notifier).retry();
@@ -170,6 +215,7 @@ void main() {
   testWidgets('마감 및 접근 불가 Job Card를 표시한다', (tester) async {
     const jobs = [
       RecommendationJob(
+        jobId: 1,
         companyName: '네이버클라우드',
         positionName: 'Cloud Platform Engineer',
         summary: '분당 · 정규직 · D-18',
@@ -177,6 +223,7 @@ void main() {
         availability: RecommendationJobAvailability.closed,
       ),
       RecommendationJob(
+        jobId: 2,
         companyName: '네이버클라우드',
         positionName: 'Cloud Platform Engineer',
         summary: '분당 · 정규직 · D-18',
@@ -205,6 +252,7 @@ void main() {
   testWidgets('Figma 근거가 있는 추천 적합도 문구만 표시한다', (tester) async {
     const jobs = [
       RecommendationJob(
+        jobId: 3,
         companyName: '회사 A',
         positionName: '매우 추천 공고',
         summary: '서울 · 정규직 · D-10',
@@ -213,6 +261,7 @@ void main() {
         suitabilityLevel: SuitabilityLevel.highlyRecommended,
       ),
       RecommendationJob(
+        jobId: 4,
         companyName: '회사 B',
         positionName: '추천 공고',
         summary: '서울 · 정규직 · D-10',
@@ -221,6 +270,7 @@ void main() {
         suitabilityLevel: SuitabilityLevel.recommended,
       ),
       RecommendationJob(
+        jobId: 5,
         companyName: '회사 C',
         positionName: '비추천 공고',
         summary: '서울 · 정규직 · D-10',
@@ -250,6 +300,7 @@ void main() {
 ProviderContainer _containerFor({
   required String status,
   List<RecommendationItemResponse> content = const [],
+  List<RecommendationExclusionResponse> exclusions = const [],
 }) {
   return ProviderContainer(
     overrides: [
@@ -259,6 +310,10 @@ ProviderContainer _containerFor({
             response: ApiResponseRecommendationListResponse(
               success: true,
               data: _recommendationList(status: status, content: content),
+            ),
+            exclusionResponse: ApiResponseRecommendationExclusionListResponse(
+              success: true,
+              data: _recommendationExclusionList(content: exclusions),
             ),
           ),
         ),
@@ -277,6 +332,24 @@ ProviderContainer _containerForError() {
   );
 }
 
+ProviderContainer _containerForExclusionError() {
+  return ProviderContainer(
+    overrides: [
+      recommendationRepositoryProvider.overrideWithValue(
+        RecommendationRepository(
+          _FakeRestClient(
+            response: ApiResponseRecommendationListResponse(
+              success: true,
+              data: _recommendationList(status: 'READY', content: const []),
+            ),
+            exclusionError: Exception('network'),
+          ),
+        ),
+      ),
+    ],
+  );
+}
+
 RecommendationListResponse _recommendationList({
   required String status,
   required List<RecommendationItemResponse> content,
@@ -286,6 +359,20 @@ RecommendationListResponse _recommendationList({
     status: status,
     generatedAt: null,
     nextGenerationAt: null,
+    content: content,
+    page: 0,
+    size: 20,
+    totalElements: content.length,
+    totalPages: content.isEmpty ? 0 : 1,
+    first: true,
+    last: true,
+  );
+}
+
+RecommendationExclusionListResponse _recommendationExclusionList({
+  required List<RecommendationExclusionResponse> content,
+}) {
+  return RecommendationExclusionListResponse(
     content: content,
     page: 0,
     size: 20,
@@ -333,11 +420,29 @@ RecommendationItemResponse _recommendationItem() {
   );
 }
 
+RecommendationExclusionResponse _recommendationExclusion({
+  required String type,
+}) {
+  return RecommendationExclusionResponse(
+    exclusionId: 31,
+    job: _recommendationItem().job,
+    exclusionType: type,
+    createdAt: DateTime.utc(2026, 9, 3, 9),
+  );
+}
+
 class _FakeRestClient implements RestClient {
-  _FakeRestClient({this.response, this.error});
+  _FakeRestClient({
+    this.response,
+    this.exclusionResponse,
+    this.error,
+    this.exclusionError,
+  });
 
   final ApiResponseRecommendationListResponse? response;
+  final ApiResponseRecommendationExclusionListResponse? exclusionResponse;
   final Object? error;
+  final Object? exclusionError;
 
   @override
   Future<ApiResponseRecommendationListResponse> getMyRecommendations({
@@ -348,6 +453,30 @@ class _FakeRestClient implements RestClient {
     final error = this.error;
     if (error != null) throw error;
     return response!;
+  }
+
+  @override
+  Future<ApiResponseRecommendationExclusionListResponse>
+  getRecommendationExclusions({
+    String? exclusionType,
+    int page = 0,
+    int size = 20,
+  }) async {
+    final error = exclusionError;
+    if (error != null) throw error;
+    return exclusionResponse ??
+        const ApiResponseRecommendationExclusionListResponse(
+          success: true,
+          data: RecommendationExclusionListResponse(
+            content: [],
+            page: 0,
+            size: 20,
+            totalElements: 0,
+            totalPages: 0,
+            first: true,
+            last: true,
+          ),
+        );
   }
 }
 

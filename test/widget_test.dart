@@ -6,6 +6,7 @@ import 'package:geti_app/app/app.dart';
 import 'package:geti_app/core/network/rest_client.dart';
 import 'package:geti_app/core/network/session_provider.dart';
 import 'package:geti_app/features/auth/presentation/view_model/auth_view_model.dart';
+import 'package:geti_app/features/recommendation/data/dto/recommendation_exclusion_list_response.dart';
 import 'package:geti_app/features/recommendation/data/dto/recommendation_list_response.dart';
 import 'package:geti_app/features/recommendation/data/recommendation_repository.dart';
 import 'package:geti_app/shared/theme/app_colors.dart';
@@ -163,5 +164,26 @@ class _FakeRestClient implements RestClient {
     int size = 20,
   }) async {
     return response;
+  }
+
+  @override
+  Future<ApiResponseRecommendationExclusionListResponse>
+  getRecommendationExclusions({
+    String? exclusionType,
+    int page = 0,
+    int size = 20,
+  }) async {
+    return const ApiResponseRecommendationExclusionListResponse(
+      success: true,
+      data: RecommendationExclusionListResponse(
+        content: [],
+        page: 0,
+        size: 20,
+        totalElements: 0,
+        totalPages: 0,
+        first: true,
+        last: true,
+      ),
+    );
   }
 }
