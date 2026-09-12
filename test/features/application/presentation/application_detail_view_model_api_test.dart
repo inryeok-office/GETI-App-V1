@@ -52,6 +52,66 @@ void main() {
     },
   );
 
+  test('loads status history for the requested application ID', () async {
+    final repository = _FakeApplicationRepository(
+      _detail(),
+      histories: [
+        _history(
+          fromStatus: ApplicationStatus.draft,
+          toStatus: ApplicationStatus.submitted,
+          createdAt: DateTime(2026, 8, 1, 14, 32),
+        ),
+        _history(
+          fromStatus: ApplicationStatus.submitted,
+          toStatus: ApplicationStatus.revisionRequested,
+          createdAt: DateTime(2026, 8, 2, 9, 18),
+        ),
+      ],
+    );
+    final container = _container(repository);
+    addTearDown(container.dispose);
+    final provider = applicationDetailViewModelProvider('62');
+    final subscription = container.listen(
+      provider,
+      (_, _) {},
+      fireImmediately: true,
+    );
+    addTearDown(subscription.close);
+
+    await container.read(provider.notifier).retry();
+    final detail = container.read(provider).detail!;
+
+    expect(repository.requestedHistoryIds, isNotEmpty);
+    expect(repository.requestedHistoryIds.every((id) => id == 62), isTrue);
+    expect(detail.history.map((history) => history.label), ['제출 완료', '수정 요청']);
+    expect(detail.history.map((history) => history.occurredAt), [
+      '08.01 14:32',
+      '08.02 09:18',
+    ]);
+  });
+
+  test('history API failure uses the existing network error state', () async {
+    final repository = _FakeApplicationRepository(
+      _detail(),
+      historyError: Exception('history network'),
+    );
+    final container = _container(repository);
+    addTearDown(container.dispose);
+    final provider = applicationDetailViewModelProvider('62');
+    final subscription = container.listen(
+      provider,
+      (_, _) {},
+      fireImmediately: true,
+    );
+    addTearDown(subscription.close);
+
+    await container.read(provider.notifier).retry();
+
+    expect(
+      container.read(provider).screenStatus,
+      ApplicationDetailScreenStatus.networkError,
+    );
+  });
   test(
     'maps every server status supported by the existing detail UI',
     () async {
@@ -211,11 +271,19 @@ ProviderContainer _container(ApplicationRepository repository) {
 }
 
 class _FakeApplicationRepository implements ApplicationRepository {
-  _FakeApplicationRepository(this.detail, {this.error});
+  _FakeApplicationRepository(
+    this.detail, {
+    this.histories = const [],
+    this.error,
+    this.historyError,
+  });
 
   final JobApplicationDetail? detail;
+  final List<JobApplicationStatusHistory> histories;
   Object? error;
+  Object? historyError;
   final List<int> requestedIds = [];
+  final List<int> requestedHistoryIds = [];
 
   @override
   Future<JobApplicationDetail?> getApplicationDetail(int applicationId) async {
@@ -223,6 +291,16 @@ class _FakeApplicationRepository implements ApplicationRepository {
     final currentError = error;
     if (currentError != null) throw currentError;
     return detail;
+  }
+
+  @override
+  Future<List<JobApplicationStatusHistory>> getApplicationStatusHistories(
+    int applicationId,
+  ) async {
+    requestedHistoryIds.add(applicationId);
+    final currentError = historyError;
+    if (currentError != null) throw currentError;
+    return histories;
   }
 
   @override
@@ -342,5 +420,21 @@ JobApplicationDetail _detail({
               filePolicy: null,
             ),
           ],
+  );
+}
+
+JobApplicationStatusHistory _history({
+  required ApplicationStatus fromStatus,
+  required ApplicationStatus toStatus,
+  required DateTime createdAt,
+}) {
+  return JobApplicationStatusHistory(
+    historyId: 1,
+    fromStatus: fromStatus,
+    toStatus: toStatus,
+    action: 'ACTION',
+    actorMemberId: 1,
+    reason: null,
+    createdAt: createdAt,
   );
 }

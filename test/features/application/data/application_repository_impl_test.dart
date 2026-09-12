@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:geti_app/core/network/rest_client.dart';
 import 'package:geti_app/features/application/data/dto/job_application_detail_response_dto.dart';
+import 'package:geti_app/features/application/data/dto/job_application_status_history_response_dto.dart';
 import 'package:geti_app/features/application/data/dto/my_job_application_list_response_dto.dart';
 import 'package:geti_app/features/application/data/repository/application_repository_impl.dart';
 import 'package:geti_app/features/application/domain/model/application_summary.dart';
@@ -198,16 +199,113 @@ void main() {
       isNull,
     );
   });
+  test('Swagger 상태 이력 응답의 nullable reason과 상태 enum을 역직렬화한다', () {
+    final response = JobApplicationStatusHistoryApiResponseDto.fromJson({
+      'success': true,
+      'data': [
+        {
+          'historyId': 1,
+          'fromStatus': 'DRAFT',
+          'toStatus': 'SUBMITTED',
+          'action': 'SUBMIT',
+          'actorMemberId': 10,
+          'reason': null,
+          'createdAt': '2026-08-01T05:32:00Z',
+        },
+        {
+          'historyId': 2,
+          'fromStatus': 'SUBMITTED',
+          'toStatus': 'REVISION_REQUESTED',
+          'action': 'REQUEST_REVISION',
+          'actorMemberId': 20,
+          'reason': 'Please update your answer.',
+          'createdAt': '2026-08-02T00:18:00Z',
+        },
+      ],
+      'meta': {'requestId': null},
+    });
+
+    expect(response.success, isTrue);
+    expect(response.data.length, 2);
+    expect(response.data.first.historyId, 1);
+    expect(response.data.first.fromStatus, JobApplicationStatusDto.draft);
+    expect(response.data.first.toStatus, JobApplicationStatusDto.submitted);
+    expect(response.data.first.reason, isNull);
+    expect(
+      response.data.last.toStatus,
+      JobApplicationStatusDto.revisionRequested,
+    );
+    expect(response.data.last.reason, 'Please update your answer.');
+    expect(
+      response.data.last.createdAt,
+      DateTime.parse('2026-08-02T00:18:00Z'),
+    );
+  });
+
+  test('상태 이력 빈 배열을 정상 응답으로 역직렬화한다', () {
+    final response = JobApplicationStatusHistoryApiResponseDto.fromJson({
+      'success': true,
+      'data': [],
+      'meta': {'requestId': null},
+    });
+
+    expect(response.data, isEmpty);
+  });
+
+  test('실제 applicationId로 상태 이력을 조회하고 domain에 보존한다', () async {
+    final client = _FakeRestClient(
+      const {},
+      historyResponse: _historyResponse(),
+    );
+
+    final histories = await ApplicationRepositoryImpl(
+      client,
+    ).getApplicationStatusHistories(62);
+
+    expect(client.requestedHistoryIds, [62]);
+    expect(histories.map((history) => history.historyId), [1, 2]);
+    expect(histories.first.fromStatus, ApplicationStatus.draft);
+    expect(histories.first.toStatus, ApplicationStatus.submitted);
+    expect(histories.first.action, 'SUBMIT');
+    expect(histories.first.actorMemberId, 10);
+    expect(histories.first.reason, isNull);
+    expect(histories.last.reason, 'Please update your answer.');
+  });
+
+  test('상태 이력 조회 실패 응답은 예외로 전달한다', () {
+    final repository = ApplicationRepositoryImpl(
+      _FakeRestClient(
+        const {},
+        historyResponse: const JobApplicationStatusHistoryApiResponseDto(
+          success: false,
+          data: [],
+          meta: ApiResponseMetaDto(requestId: null),
+        ),
+      ),
+    );
+
+    expect(
+      () => repository.getApplicationStatusHistories(62),
+      throwsA(isA<StateError>()),
+    );
+  });
 }
 
 class _FakeRestClient implements RestClient {
-  _FakeRestClient(this.pages, {this.detailResponse, this.detailError});
+  _FakeRestClient(
+    this.pages, {
+    this.detailResponse,
+    this.detailError,
+    this.historyResponse,
+  });
 
   final Map<int, MyJobApplicationListApiResponseDto> pages;
   final JobApplicationDetailApiResponseDto? detailResponse;
   final Object? detailError;
+  final JobApplicationStatusHistoryApiResponseDto? historyResponse;
   final List<int> requestedPages = [];
   final List<int> requestedDetailIds = [];
+  final List<int> requestedHistoryIds = [];
 
   @override
   Future<JobApplicationDetailApiResponseDto> getJobApplicationDetail(
@@ -217,6 +315,13 @@ class _FakeRestClient implements RestClient {
     final currentError = detailError;
     if (currentError != null) throw currentError;
     return detailResponse!;
+  }
+
+  @override
+  Future<JobApplicationStatusHistoryApiResponseDto>
+  getJobApplicationStatusHistory(int applicationId) async {
+    requestedHistoryIds.add(applicationId);
+    return historyResponse!;
   }
 
   @override
@@ -356,6 +461,33 @@ JobApplicationDetailApiResponseDto _detailResponse() {
         ),
       ],
     ),
+    meta: const ApiResponseMetaDto(requestId: null),
+  );
+}
+
+JobApplicationStatusHistoryApiResponseDto _historyResponse() {
+  return JobApplicationStatusHistoryApiResponseDto(
+    success: true,
+    data: [
+      JobApplicationStatusHistoryResponseDto(
+        historyId: 1,
+        fromStatus: JobApplicationStatusDto.draft,
+        toStatus: JobApplicationStatusDto.submitted,
+        action: 'SUBMIT',
+        actorMemberId: 10,
+        reason: null,
+        createdAt: DateTime.utc(2026, 8, 1, 5, 32),
+      ),
+      JobApplicationStatusHistoryResponseDto(
+        historyId: 2,
+        fromStatus: JobApplicationStatusDto.submitted,
+        toStatus: JobApplicationStatusDto.revisionRequested,
+        action: 'REQUEST_REVISION',
+        actorMemberId: 20,
+        reason: 'Please update your answer.',
+        createdAt: DateTime.utc(2026, 8, 2, 0, 18),
+      ),
+    ],
     meta: const ApiResponseMetaDto(requestId: null),
   );
 }

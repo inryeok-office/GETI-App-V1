@@ -5,4 +5,8 @@ abstract interface class ApplicationRepository {
   Future<List<ApplicationSummary>> getMyApplications();
 
   Future<JobApplicationDetail?> getApplicationDetail(int applicationId);
+
+  Future<List<JobApplicationStatusHistory>> getApplicationStatusHistories(
+    int applicationId,
+  );
 }

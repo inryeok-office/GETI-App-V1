@@ -121,6 +121,11 @@ class _FakeApplicationRepository implements ApplicationRepository {
       null;
 
   @override
+  Future<List<JobApplicationStatusHistory>> getApplicationStatusHistories(
+    int applicationId,
+  ) async => const [];
+
+  @override
   Future<List<ApplicationSummary>> getMyApplications() async {
     final currentError = error;
     if (currentError != null) throw currentError;

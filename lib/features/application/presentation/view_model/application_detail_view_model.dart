@@ -161,7 +161,12 @@ class ApplicationDetailViewModel extends _$ApplicationDetailViewModel {
         return;
       }
 
-      final detail = _toPresentation(domain);
+      final histories = await repository.getApplicationStatusHistories(
+        parsedApplicationId,
+      );
+      if (!ref.mounted) return;
+
+      final detail = _toPresentation(domain, histories);
       state = ApplicationDetailViewState(
         screenStatus: detail == null
             ? ApplicationDetailScreenStatus.empty
@@ -176,7 +181,10 @@ class ApplicationDetailViewModel extends _$ApplicationDetailViewModel {
     }
   }
 
-  ApplicationDetail? _toPresentation(JobApplicationDetail detail) {
+  ApplicationDetail? _toPresentation(
+    JobApplicationDetail detail,
+    List<JobApplicationStatusHistory> histories,
+  ) {
     final variant = _toVariant(detail.status);
     if (variant == null) return null;
 
@@ -221,7 +229,7 @@ class ApplicationDetailViewModel extends _$ApplicationDetailViewModel {
       submittedAt: formatApplicationDateTime(detail.submittedAt),
       answers: List.unmodifiable(answers),
       files: List.unmodifiable(files),
-      history: const [],
+      history: List.unmodifiable(histories.map(_toStatusHistory)),
       availableActions: List.unmodifiable(detail.availableActions),
       noticeTitle: isRevision && reason != null && reason.isNotEmpty
           ? '수정·보완 요청'
@@ -234,6 +242,37 @@ class ApplicationDetailViewModel extends _$ApplicationDetailViewModel {
           ? '해당 지원이 취소되었습니다.'
           : null,
     );
+  }
+
+  ApplicationStatusHistory _toStatusHistory(
+    JobApplicationStatusHistory history,
+  ) {
+    return ApplicationStatusHistory(
+      label: _statusHistoryLabel(history.toStatus),
+      occurredAt: _formatStatusHistoryDateTime(history.createdAt),
+    );
+  }
+
+  String _statusHistoryLabel(ApplicationStatus status) {
+    return switch (status) {
+      ApplicationStatus.draft => '임시저장',
+      ApplicationStatus.submitted => '제출 완료',
+      ApplicationStatus.editRequested ||
+      ApplicationStatus.editAllowed ||
+      ApplicationStatus.revisionRequested => '수정 요청',
+      ApplicationStatus.approved => '합격',
+      ApplicationStatus.rejected => '불합격',
+      ApplicationStatus.forwarded => '검토 중',
+      ApplicationStatus.withdrawn => '지원 취소',
+    };
+  }
+
+  String _formatStatusHistoryDateTime(DateTime value) {
+    final local = value.toLocal();
+    return '${local.month.toString().padLeft(2, '0')}.'
+        '${local.day.toString().padLeft(2, '0')} '
+        '${local.hour.toString().padLeft(2, '0')}:'
+        '${local.minute.toString().padLeft(2, '0')}';
   }
 
   ApplicationDetailVariant? _toVariant(ApplicationStatus status) {
