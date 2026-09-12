@@ -140,6 +140,113 @@ void main() {
     expect(updatedState.uninterestedScope, UninterestedScope.similarJobs);
   });
 
+  test('loadNextPage appends next recommendation page', () async {
+    final client = _FakeRestClient(
+      responseByPage: {
+        0: ApiResponseRecommendationListResponse(
+          success: true,
+          data: _recommendationList(
+            status: 'READY',
+            content: [_recommendationItem(jobId: 10)],
+            page: 0,
+            totalElements: 2,
+            totalPages: 2,
+            first: true,
+            last: false,
+          ),
+        ),
+        1: ApiResponseRecommendationListResponse(
+          success: true,
+          data: _recommendationList(
+            status: 'READY',
+            content: [_recommendationItem(jobId: 11)],
+            page: 1,
+            totalElements: 2,
+            totalPages: 2,
+            first: false,
+            last: true,
+          ),
+        ),
+      },
+    );
+    final container = ProviderContainer(
+      overrides: [
+        recommendationRepositoryProvider.overrideWithValue(
+          RecommendationRepository(client),
+        ),
+      ],
+    );
+    addTearDown(container.dispose);
+
+    final viewModel = container.read(recommendationViewModelProvider.notifier);
+    await viewModel.retry();
+    await viewModel.loadNextPage();
+    final state = container.read(recommendationViewModelProvider);
+
+    expect(state.jobs.map((job) => job.jobId), [10, 11]);
+    expect(state.page, 1);
+    expect(state.last, isTrue);
+    expect(client.requestedPages, [0, 1]);
+  });
+
+  test('multiple exclusion pages are merged before restoring state', () async {
+    final client = _FakeRestClient(
+      response: ApiResponseRecommendationListResponse(
+        success: true,
+        data: _recommendationList(
+          status: 'READY',
+          content: [
+            _recommendationItem(jobId: 10),
+            _recommendationItem(jobId: 11),
+          ],
+        ),
+      ),
+      exclusionResponseByPage: {
+        0: ApiResponseRecommendationExclusionListResponse(
+          success: true,
+          data: _recommendationExclusionList(
+            content: [_recommendationExclusion(jobId: 10, type: 'THIS_JOB')],
+            page: 0,
+            totalElements: 2,
+            totalPages: 2,
+            first: true,
+            last: false,
+          ),
+        ),
+        1: ApiResponseRecommendationExclusionListResponse(
+          success: true,
+          data: _recommendationExclusionList(
+            content: [
+              _recommendationExclusion(jobId: 11, type: 'SIMILAR_JOBS'),
+            ],
+            page: 1,
+            totalElements: 2,
+            totalPages: 2,
+            first: false,
+            last: true,
+          ),
+        ),
+      },
+    );
+    final container = ProviderContainer(
+      overrides: [
+        recommendationRepositoryProvider.overrideWithValue(
+          RecommendationRepository(client),
+        ),
+      ],
+    );
+    addTearDown(container.dispose);
+
+    await container.read(recommendationViewModelProvider.notifier).retry();
+    final state = container.read(recommendationViewModelProvider);
+
+    expect(state.uninterestedJobIds, {10, 11});
+    expect(state.recommendationExclusions.length, 2);
+    expect(state.exclusionPage, 1);
+    expect(state.exclusionLast, isTrue);
+    expect(client.exclusionRequestedPages, [0, 1]);
+  });
+
   test('API error maps to existing failure state', () async {
     final container = _containerForError();
     addTearDown(container.dispose);
@@ -152,16 +259,16 @@ void main() {
     );
   });
 
-  test('관심 없음 목록 API error도 기존 failure 상태로 연결한다', () async {
+  test('exclusion API error keeps successful recommendation result', () async {
     final container = _containerForExclusionError();
     addTearDown(container.dispose);
 
     await container.read(recommendationViewModelProvider.notifier).retry();
+    final state = container.read(recommendationViewModelProvider);
 
-    expect(
-      container.read(recommendationViewModelProvider).status,
-      RecommendationStatus.failure,
-    );
+    expect(state.status, RecommendationStatus.loaded);
+    expect(state.jobs, isEmpty);
+    expect(state.uninterestedJobIds, isEmpty);
   });
 
   testWidgets('추천 결과 없음 상태를 표시한다', (tester) async {
@@ -353,6 +460,11 @@ ProviderContainer _containerForExclusionError() {
 RecommendationListResponse _recommendationList({
   required String status,
   required List<RecommendationItemResponse> content,
+  int page = 0,
+  int totalElements = -1,
+  int totalPages = -1,
+  bool first = true,
+  bool last = true,
 }) {
   return RecommendationListResponse(
     enabled: status != 'DISABLED',
@@ -360,34 +472,39 @@ RecommendationListResponse _recommendationList({
     generatedAt: null,
     nextGenerationAt: null,
     content: content,
-    page: 0,
+    page: page,
     size: 20,
-    totalElements: content.length,
-    totalPages: content.isEmpty ? 0 : 1,
-    first: true,
-    last: true,
+    totalElements: totalElements < 0 ? content.length : totalElements,
+    totalPages: totalPages < 0 ? (content.isEmpty ? 0 : 1) : totalPages,
+    first: first,
+    last: last,
   );
 }
 
 RecommendationExclusionListResponse _recommendationExclusionList({
   required List<RecommendationExclusionResponse> content,
+  int page = 0,
+  int totalElements = -1,
+  int totalPages = -1,
+  bool first = true,
+  bool last = true,
 }) {
   return RecommendationExclusionListResponse(
     content: content,
-    page: 0,
+    page: page,
     size: 20,
-    totalElements: content.length,
-    totalPages: content.isEmpty ? 0 : 1,
-    first: true,
-    last: true,
+    totalElements: totalElements < 0 ? content.length : totalElements,
+    totalPages: totalPages < 0 ? (content.isEmpty ? 0 : 1) : totalPages,
+    first: first,
+    last: last,
   );
 }
 
-RecommendationItemResponse _recommendationItem() {
+RecommendationItemResponse _recommendationItem({int jobId = 10}) {
   return RecommendationItemResponse(
-    recommendationId: 1,
-    job: const RecommendationJobResponse(
-      jobId: 10,
+    recommendationId: jobId,
+    job: RecommendationJobResponse(
+      jobId: jobId,
       title: 'Backend Engineer',
       postingType: 'GENERAL',
       applicationMethod: 'INTERNAL',
@@ -421,11 +538,12 @@ RecommendationItemResponse _recommendationItem() {
 }
 
 RecommendationExclusionResponse _recommendationExclusion({
+  int jobId = 10,
   required String type,
 }) {
   return RecommendationExclusionResponse(
     exclusionId: 31,
-    job: _recommendationItem().job,
+    job: _recommendationItem(jobId: jobId).job,
     exclusionType: type,
     createdAt: DateTime.utc(2026, 9, 3, 9),
   );
@@ -434,15 +552,22 @@ RecommendationExclusionResponse _recommendationExclusion({
 class _FakeRestClient implements RestClient {
   _FakeRestClient({
     this.response,
+    this.responseByPage = const {},
     this.exclusionResponse,
+    this.exclusionResponseByPage = const {},
     this.error,
     this.exclusionError,
   });
 
   final ApiResponseRecommendationListResponse? response;
+  final Map<int, ApiResponseRecommendationListResponse> responseByPage;
   final ApiResponseRecommendationExclusionListResponse? exclusionResponse;
+  final Map<int, ApiResponseRecommendationExclusionListResponse>
+  exclusionResponseByPage;
   final Object? error;
   final Object? exclusionError;
+  final requestedPages = <int>[];
+  final exclusionRequestedPages = <int>[];
 
   @override
   Future<ApiResponseRecommendationListResponse> getMyRecommendations({
@@ -450,9 +575,10 @@ class _FakeRestClient implements RestClient {
     int page = 0,
     int size = 20,
   }) async {
+    requestedPages.add(page);
     final error = this.error;
     if (error != null) throw error;
-    return response!;
+    return responseByPage[page] ?? response!;
   }
 
   @override
@@ -462,9 +588,11 @@ class _FakeRestClient implements RestClient {
     int page = 0,
     int size = 20,
   }) async {
+    exclusionRequestedPages.add(page);
     final error = exclusionError;
     if (error != null) throw error;
-    return exclusionResponse ??
+    return exclusionResponseByPage[page] ??
+        exclusionResponse ??
         const ApiResponseRecommendationExclusionListResponse(
           success: true,
           data: RecommendationExclusionListResponse(

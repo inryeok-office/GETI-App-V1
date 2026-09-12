@@ -67,6 +67,7 @@ class RecommendationViewState {
     this.showUninterestedSuccess = false,
     this.isUnsetting = false,
     this.bookmarkedJobs = const {},
+    this.isLoadingNextPage = false,
     this.enabled,
     this.serverStatus,
     this.generatedAt,
@@ -95,6 +96,7 @@ class RecommendationViewState {
   final bool showUninterestedSuccess;
   final bool isUnsetting;
   final Set<RecommendationJob> bookmarkedJobs;
+  final bool isLoadingNextPage;
   final bool? enabled;
   final String? serverStatus;
   final DateTime? generatedAt;
@@ -123,6 +125,7 @@ class RecommendationViewState {
     bool? showUninterestedSuccess,
     bool? isUnsetting,
     Set<RecommendationJob>? bookmarkedJobs,
+    bool? isLoadingNextPage,
     bool? enabled,
     String? serverStatus,
     DateTime? generatedAt,
@@ -154,6 +157,7 @@ class RecommendationViewState {
           showUninterestedSuccess ?? this.showUninterestedSuccess,
       isUnsetting: isUnsetting ?? this.isUnsetting,
       bookmarkedJobs: bookmarkedJobs ?? this.bookmarkedJobs,
+      isLoadingNextPage: isLoadingNextPage ?? this.isLoadingNextPage,
       enabled: enabled ?? this.enabled,
       serverStatus: serverStatus ?? this.serverStatus,
       generatedAt: generatedAt ?? this.generatedAt,
@@ -212,6 +216,7 @@ class RecommendationViewModel extends _$RecommendationViewModel {
       uninterestedJobIds: const <int>{},
       recommendationExclusions: const [],
       bookmarkedJobs: const <RecommendationJob>{},
+      isLoadingNextPage: false,
     );
 
     try {
@@ -222,51 +227,136 @@ class RecommendationViewModel extends _$RecommendationViewModel {
       );
       if (!ref.mounted || requestVersion != _requestVersion) return;
 
-      final exclusionResponse = await repository.getRecommendationExclusions(
-        page: _recommendationExclusionPage,
-        size: _recommendationExclusionPageSize,
+      _applyRecommendationResponse(
+        response: response,
+        append: false,
+        exclusions: const [],
+      );
+
+      final exclusionResponse = await _fetchAllRecommendationExclusions(
+        repository,
       );
       if (!ref.mounted || requestVersion != _requestVersion) return;
-
-      final jobs = response.status == 'READY'
-          ? response.content
-                .map(recommendationJobFromItem)
-                .toList(growable: false)
-          : const <RecommendationJob>[];
-      final bookmarkedJobs = <RecommendationJob>{
-        for (var i = 0; i < response.content.length && i < jobs.length; i++)
-          if (response.content[i].job.bookmarked) jobs[i],
-      };
-
-      state = state.copyWith(
-        status: recommendationStatusFromApi(response.status),
-        jobs: jobs,
-        uninterestedJobIds: exclusionResponse.content
-            .map((exclusion) => exclusion.job.jobId)
-            .toSet(),
-        recommendationExclusions: exclusionResponse.content,
-        bookmarkedJobs: bookmarkedJobs,
-        enabled: response.enabled,
-        serverStatus: response.status,
-        generatedAt: response.generatedAt,
-        nextGenerationAt: response.nextGenerationAt,
-        page: response.page,
-        size: response.size,
-        totalElements: response.totalElements,
-        totalPages: response.totalPages,
-        first: response.first,
-        last: response.last,
-        exclusionPage: exclusionResponse.page,
-        exclusionSize: exclusionResponse.size,
-        exclusionTotalElements: exclusionResponse.totalElements,
-        exclusionTotalPages: exclusionResponse.totalPages,
-        exclusionFirst: exclusionResponse.first,
-        exclusionLast: exclusionResponse.last,
-      );
+      if (exclusionResponse != null) {
+        _applyExclusionResponse(exclusionResponse);
+      }
     } catch (_) {
       if (!ref.mounted || requestVersion != _requestVersion) return;
       state = state.copyWith(status: RecommendationStatus.failure);
     }
+  }
+
+  Future<void> loadNextPage() async {
+    if (state.status != RecommendationStatus.loaded ||
+        state.last ||
+        state.isLoadingNextPage) {
+      return;
+    }
+
+    final requestVersion = _requestVersion;
+    state = state.copyWith(isLoadingNextPage: true);
+
+    try {
+      final response = await ref
+          .read(recommendationRepositoryProvider)
+          .getMyRecommendations(page: state.page + 1, size: state.size);
+      if (!ref.mounted || requestVersion != _requestVersion) return;
+
+      _applyRecommendationResponse(
+        response: response,
+        append: true,
+        exclusions: state.recommendationExclusions,
+      );
+    } catch (_) {
+      if (!ref.mounted || requestVersion != _requestVersion) return;
+      state = state.copyWith(isLoadingNextPage: false);
+    }
+  }
+
+  void _applyRecommendationResponse({
+    required RecommendationListResponse response,
+    required bool append,
+    required List<RecommendationExclusionResponse> exclusions,
+  }) {
+    final nextJobs = response.status == 'READY'
+        ? response.content
+              .map(recommendationJobFromItem)
+              .toList(growable: false)
+        : const <RecommendationJob>[];
+    final jobs = append ? [...state.jobs, ...nextJobs] : nextJobs;
+    final bookmarkedJobs = <RecommendationJob>{
+      if (append) ...state.bookmarkedJobs,
+      for (var i = 0; i < response.content.length && i < nextJobs.length; i++)
+        if (response.content[i].job.bookmarked) nextJobs[i],
+    };
+
+    state = state.copyWith(
+      status: recommendationStatusFromApi(response.status),
+      jobs: jobs,
+      bookmarkedJobs: bookmarkedJobs,
+      enabled: response.enabled,
+      serverStatus: response.status,
+      generatedAt: response.generatedAt,
+      nextGenerationAt: response.nextGenerationAt,
+      page: response.page,
+      size: response.size,
+      totalElements: response.totalElements,
+      totalPages: response.totalPages,
+      first: response.first,
+      last: response.last,
+      isLoadingNextPage: false,
+      uninterestedJobIds: exclusions
+          .map((exclusion) => exclusion.job.jobId)
+          .toSet(),
+      recommendationExclusions: exclusions,
+    );
+  }
+
+  Future<RecommendationExclusionListResponse?>
+  _fetchAllRecommendationExclusions(RecommendationRepository repository) async {
+    try {
+      final responses = <RecommendationExclusionListResponse>[];
+      var page = _recommendationExclusionPage;
+      while (true) {
+        final response = await repository.getRecommendationExclusions(
+          page: page,
+          size: _recommendationExclusionPageSize,
+        );
+        responses.add(response);
+        if (response.last) break;
+        page = response.page + 1;
+      }
+
+      final lastResponse = responses.last;
+      return RecommendationExclusionListResponse(
+        content: responses
+            .expand((response) => response.content)
+            .toList(growable: false),
+        page: lastResponse.page,
+        size: lastResponse.size,
+        totalElements: lastResponse.totalElements,
+        totalPages: lastResponse.totalPages,
+        first: responses.first.first,
+        last: lastResponse.last,
+      );
+    } catch (_) {
+      return null;
+    }
+  }
+
+  void _applyExclusionResponse(RecommendationExclusionListResponse response) {
+    state = state.copyWith(
+      uninterestedJobIds: response.content
+          .map((exclusion) => exclusion.job.jobId)
+          .toSet(),
+      recommendationExclusions: response.content,
+      exclusionPage: response.page,
+      exclusionSize: response.size,
+      exclusionTotalElements: response.totalElements,
+      exclusionTotalPages: response.totalPages,
+      exclusionFirst: response.first,
+      exclusionLast: response.last,
+    );
   }
 
   void startGeneration() {
