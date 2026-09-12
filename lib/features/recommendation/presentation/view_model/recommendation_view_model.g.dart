@@ -43,7 +43,7 @@ final class RecommendationViewModelProvider
 }
 
 String _$recommendationViewModelHash() =>
-    r'bfcb772bc7dd170c3603239bda5ce9cabf1704ed';
+    r'c4e270a5d49c6c2c068e4d27a9b41c384e9507f1';
 
 abstract class _$RecommendationViewModel
     extends $Notifier<RecommendationViewState> {
