@@ -258,8 +258,8 @@ class ApplicationDetailViewModel extends _$ApplicationDetailViewModel {
       ApplicationStatus.draft => '임시저장',
       ApplicationStatus.submitted => '제출 완료',
       ApplicationStatus.editRequested ||
-      ApplicationStatus.editAllowed ||
       ApplicationStatus.revisionRequested => '수정 요청',
+      ApplicationStatus.editAllowed => '수정 허용',
       ApplicationStatus.approved => '합격',
       ApplicationStatus.rejected => '불합격',
       ApplicationStatus.forwarded => '검토 중',

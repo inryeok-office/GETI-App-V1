@@ -146,7 +146,14 @@ class ApplicationRepositoryImpl implements ApplicationRepository {
       throw StateError('지원 상태 이력 조회에 실패했습니다.');
     }
 
-    return List.unmodifiable(response.data.map(_statusHistoryToDomain));
+    final histories = <JobApplicationStatusHistory>[];
+    for (final dto in response.data) {
+      final history = _statusHistoryToDomain(dto);
+      if (history != null) {
+        histories.add(history);
+      }
+    }
+    return List.unmodifiable(histories);
   }
 
   ApplicationSummary _toDomain(MyJobApplicationListItemDto dto) {
@@ -167,27 +174,27 @@ class ApplicationRepositoryImpl implements ApplicationRepository {
     );
   }
 
-  JobApplicationStatusHistory _statusHistoryToDomain(
+  JobApplicationStatusHistory? _statusHistoryToDomain(
     JobApplicationStatusHistoryResponseDto dto,
   ) {
     final historyId = dto.historyId;
-    final fromStatus = dto.fromStatus;
     final toStatus = dto.toStatus;
     final action = dto.action;
     final actorMemberId = dto.actorMemberId;
     final createdAt = dto.createdAt;
     if (historyId == null ||
-        fromStatus == null ||
         toStatus == null ||
         action == null ||
         actorMemberId == null ||
         createdAt == null) {
-      throw const FormatException('지원 상태 이력 응답의 필수 값이 없습니다.');
+      return null;
     }
 
     return JobApplicationStatusHistory(
       historyId: historyId,
-      fromStatus: _toDomainStatus(fromStatus),
+      fromStatus: dto.fromStatus == null
+          ? null
+          : _toDomainStatus(dto.fromStatus!),
       toStatus: _toDomainStatus(toStatus),
       action: action,
       actorMemberId: actorMemberId,

@@ -124,7 +124,7 @@ class JobApplicationStatusHistory {
   });
 
   final int historyId;
-  final ApplicationStatus fromStatus;
+  final ApplicationStatus? fromStatus;
   final ApplicationStatus toStatus;
   final String action;
   final int actorMemberId;

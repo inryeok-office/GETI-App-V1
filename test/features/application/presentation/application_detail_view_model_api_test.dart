@@ -66,6 +66,11 @@ void main() {
           toStatus: ApplicationStatus.revisionRequested,
           createdAt: DateTime(2026, 8, 2, 9, 18),
         ),
+        _history(
+          fromStatus: ApplicationStatus.revisionRequested,
+          toStatus: ApplicationStatus.editAllowed,
+          createdAt: DateTime(2026, 8, 3, 10, 30),
+        ),
       ],
     );
     final container = _container(repository);
@@ -83,10 +88,15 @@ void main() {
 
     expect(repository.requestedHistoryIds, isNotEmpty);
     expect(repository.requestedHistoryIds.every((id) => id == 62), isTrue);
-    expect(detail.history.map((history) => history.label), ['제출 완료', '수정 요청']);
+    expect(detail.history.map((history) => history.label), [
+      '제출 완료',
+      '수정 요청',
+      '수정 허용',
+    ]);
     expect(detail.history.map((history) => history.occurredAt), [
       '08.01 14:32',
       '08.02 09:18',
+      '08.03 10:30',
     ]);
   });
 

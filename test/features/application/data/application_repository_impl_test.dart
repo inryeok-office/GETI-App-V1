@@ -272,6 +272,40 @@ void main() {
     expect(histories.last.reason, 'Please update your answer.');
   });
 
+  test('상태 이력은 최초 이력의 null fromStatus를 허용하고 깨진 항목만 제외한다', () async {
+    final client = _FakeRestClient(
+      const {},
+      historyResponse: JobApplicationStatusHistoryApiResponseDto(
+        success: true,
+        data: [
+          JobApplicationStatusHistoryResponseDto(
+            historyId: 1,
+            toStatus: JobApplicationStatusDto.submitted,
+            action: 'SUBMIT',
+            actorMemberId: 10,
+            createdAt: DateTime.parse('2026-08-01T05:32:00Z'),
+          ),
+          JobApplicationStatusHistoryResponseDto(
+            historyId: 2,
+            fromStatus: JobApplicationStatusDto.submitted,
+            action: 'UNKNOWN_STATUS',
+            actorMemberId: 20,
+            createdAt: DateTime.parse('2026-08-02T00:18:00Z'),
+          ),
+        ],
+        meta: const ApiResponseMetaDto(requestId: null),
+      ),
+    );
+
+    final histories = await ApplicationRepositoryImpl(
+      client,
+    ).getApplicationStatusHistories(62);
+
+    expect(histories, hasLength(1));
+    expect(histories.single.fromStatus, isNull);
+    expect(histories.single.toStatus, ApplicationStatus.submitted);
+  });
+
   test('상태 이력 조회 실패 응답은 예외로 전달한다', () {
     final repository = ApplicationRepositoryImpl(
       _FakeRestClient(
