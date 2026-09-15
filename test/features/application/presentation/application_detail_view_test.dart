@@ -455,6 +455,11 @@ class _FakeDetailRepository implements ApplicationRepository {
       details[applicationId];
 
   @override
+  Future<List<JobApplicationStatusHistory>> getApplicationStatusHistories(
+    int applicationId,
+  ) async => const [];
+
+  @override
   Future<List<ApplicationSummary>> getMyApplications() async => const [];
 }
 

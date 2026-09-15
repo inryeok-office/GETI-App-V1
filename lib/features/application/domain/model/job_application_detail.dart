@@ -111,3 +111,23 @@ class JobApplicationQuestion {
   final List<String>? options;
   final Object? filePolicy;
 }
+
+class JobApplicationStatusHistory {
+  const JobApplicationStatusHistory({
+    required this.historyId,
+    required this.fromStatus,
+    required this.toStatus,
+    required this.action,
+    required this.actorMemberId,
+    required this.reason,
+    required this.createdAt,
+  });
+
+  final int historyId;
+  final ApplicationStatus? fromStatus;
+  final ApplicationStatus toStatus;
+  final String action;
+  final int actorMemberId;
+  final String? reason;
+  final DateTime createdAt;
+}

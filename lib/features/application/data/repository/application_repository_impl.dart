@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:geti_app/core/network/rest_client.dart';
 import 'package:geti_app/features/application/data/dto/job_application_detail_response_dto.dart';
+import 'package:geti_app/features/application/data/dto/job_application_status_history_response_dto.dart';
 import 'package:geti_app/features/application/data/dto/my_job_application_list_response_dto.dart';
 import 'package:geti_app/features/application/domain/model/job_application_detail.dart';
 import 'package:geti_app/features/application/domain/model/application_summary.dart';
@@ -134,6 +135,27 @@ class ApplicationRepositoryImpl implements ApplicationRepository {
     );
   }
 
+  @override
+  Future<List<JobApplicationStatusHistory>> getApplicationStatusHistories(
+    int applicationId,
+  ) async {
+    final response = await _client.getJobApplicationStatusHistory(
+      applicationId,
+    );
+    if (response.success != true) {
+      throw StateError('지원 상태 이력 조회에 실패했습니다.');
+    }
+
+    final histories = <JobApplicationStatusHistory>[];
+    for (final dto in response.data) {
+      final history = _statusHistoryToDomain(dto);
+      if (history != null) {
+        histories.add(history);
+      }
+    }
+    return List.unmodifiable(histories);
+  }
+
   ApplicationSummary _toDomain(MyJobApplicationListItemDto dto) {
     final job = dto.job;
     return ApplicationSummary(
@@ -149,6 +171,35 @@ class ApplicationRepositoryImpl implements ApplicationRepository {
       status: _toDomainStatus(dto.status),
       submittedAt: dto.submittedAt,
       updatedAt: dto.updatedAt,
+    );
+  }
+
+  JobApplicationStatusHistory? _statusHistoryToDomain(
+    JobApplicationStatusHistoryResponseDto dto,
+  ) {
+    final historyId = dto.historyId;
+    final toStatus = dto.toStatus;
+    final action = dto.action;
+    final actorMemberId = dto.actorMemberId;
+    final createdAt = dto.createdAt;
+    if (historyId == null ||
+        toStatus == null ||
+        action == null ||
+        actorMemberId == null ||
+        createdAt == null) {
+      return null;
+    }
+
+    return JobApplicationStatusHistory(
+      historyId: historyId,
+      fromStatus: dto.fromStatus == null
+          ? null
+          : _toDomainStatus(dto.fromStatus!),
+      toStatus: _toDomainStatus(toStatus),
+      action: action,
+      actorMemberId: actorMemberId,
+      reason: dto.reason,
+      createdAt: createdAt,
     );
   }
 
