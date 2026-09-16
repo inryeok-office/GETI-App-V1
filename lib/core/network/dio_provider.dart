@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import 'package:geti_app/core/config/app_config.dart';
 import 'package:geti_app/core/network/session_provider.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
@@ -19,6 +20,9 @@ Dio dio(Ref ref) {
   }
 
   final client = Dio(options);
+  if (kDebugMode) {
+    client.interceptors.add(_SafeDioLogInterceptor());
+  }
   client.interceptors.add(
     InterceptorsWrapper(
       onError: (error, handler) {
@@ -31,4 +35,96 @@ Dio dio(Ref ref) {
   );
   ref.onDispose(() => client.close(force: true));
   return client;
+}
+
+class _SafeDioLogInterceptor extends Interceptor {
+  static const _sensitiveHeaderNames = {
+    'authorization',
+    'cookie',
+    'set-cookie',
+    'x-access-token',
+    'x-refresh-token',
+  };
+
+  @override
+  void onRequest(RequestOptions options, RequestInterceptorHandler handler) {
+    _log(
+      '[DIO REQUEST]\n'
+      'Method: ${options.method}\n'
+      'URL: ${options.uri}\n'
+      'Query: ${_sanitize(options.queryParameters)}\n'
+      'Headers: ${_sanitizeHeaders(options.headers)}\n'
+      'Body: ${_sanitize(options.data)}',
+    );
+    handler.next(options);
+  }
+
+  @override
+  void onResponse(
+    Response<dynamic> response,
+    ResponseInterceptorHandler handler,
+  ) {
+    _log(
+      '[DIO RESPONSE]\n'
+      'Status: ${response.statusCode}\n'
+      'URL: ${response.requestOptions.uri}\n'
+      'Headers: ${_sanitizeHeaders(response.headers.map)}\n'
+      'Response: ${_sanitize(response.data)}',
+    );
+    handler.next(response);
+  }
+
+  @override
+  void onError(DioException err, ErrorInterceptorHandler handler) {
+    final response = err.response;
+    _log(
+      '[DIO ERROR]\n'
+      'Method: ${err.requestOptions.method}\n'
+      'URL: ${err.requestOptions.uri}\n'
+      'Status: ${response?.statusCode}\n'
+      'Query: ${_sanitize(err.requestOptions.queryParameters)}\n'
+      'Headers: ${_sanitizeHeaders(err.requestOptions.headers)}\n'
+      'Body: ${_sanitize(err.requestOptions.data)}\n'
+      'Response: ${_sanitize(response?.data)}\n'
+      'Error: ${err.type} ${err.message ?? ''}',
+    );
+    handler.next(err);
+  }
+
+  Map<String, Object?> _sanitizeHeaders(Map<String, dynamic> headers) {
+    return headers.map((key, value) {
+      final lowerKey = key.toLowerCase();
+      final isSensitive =
+          _sensitiveHeaderNames.contains(lowerKey) ||
+          lowerKey.contains('token') ||
+          lowerKey.contains('authorization') ||
+          lowerKey.contains('cookie');
+      return MapEntry(key, isSensitive ? '[REDACTED]' : _sanitize(value));
+    });
+  }
+
+  Object? _sanitize(Object? value) {
+    return switch (value) {
+      Map<dynamic, dynamic>() => value.map((key, nestedValue) {
+        final keyText = key.toString();
+        final lowerKey = keyText.toLowerCase();
+        final isSensitive =
+            lowerKey.contains('token') ||
+            lowerKey.contains('authorization') ||
+            lowerKey.contains('cookie') ||
+            lowerKey.contains('password') ||
+            lowerKey.contains('secret');
+        return MapEntry(
+          keyText,
+          isSensitive ? '[REDACTED]' : _sanitize(nestedValue),
+        );
+      }),
+      Iterable<dynamic>() => value.map(_sanitize).toList(growable: false),
+      _ => value,
+    };
+  }
+
+  void _log(String message) {
+    debugPrint(message);
+  }
 }
