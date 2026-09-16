@@ -1,6 +1,5 @@
-import 'dart:typed_data';
-
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:geti_app/core/network/dio_provider.dart';
@@ -58,6 +57,37 @@ void main() {
     await expectLater(dio.get<void>('/anything'), throwsA(isA<DioException>()));
 
     expect(container.read(sessionExpiredProvider), isFalse);
+  });
+
+  test('dio 로그는 URI query의 민감 값을 원문으로 출력하지 않는다', () async {
+    final logs = <String>[];
+    final previousDebugPrint = debugPrint;
+    debugPrint = (message, {wrapWidth}) {
+      if (message != null) {
+        logs.add(message);
+      }
+    };
+    addTearDown(() => debugPrint = previousDebugPrint);
+
+    final container = ProviderContainer();
+    addTearDown(container.dispose);
+
+    final dio = container.read(dioProvider);
+    dio.httpClientAdapter = _UnauthorizedAdapter();
+
+    await expectLater(
+      dio.get<void>(
+        '/anything',
+        queryParameters: {'token': 'raw-token', 'page': 1},
+      ),
+      throwsA(isA<DioException>()),
+    );
+
+    final output = logs.join('\n');
+    expect(output, contains('URL: /anything'));
+    expect(output, contains('Query: {token: [REDACTED], page: 1}'));
+    expect(output, isNot(contains('raw-token')));
+    expect(output, isNot(contains('token=raw-token')));
   });
 }
 
