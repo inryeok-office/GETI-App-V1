@@ -51,7 +51,7 @@ class _SafeDioLogInterceptor extends Interceptor {
     _log(
       '[DIO REQUEST]\n'
       'Method: ${options.method}\n'
-      'URL: ${options.uri}\n'
+      'URL: ${_sanitizeUri(options.uri)}\n'
       'Query: ${_sanitize(options.queryParameters)}\n'
       'Headers: ${_sanitizeHeaders(options.headers)}\n'
       'Body: ${_sanitize(options.data)}',
@@ -67,7 +67,7 @@ class _SafeDioLogInterceptor extends Interceptor {
     _log(
       '[DIO RESPONSE]\n'
       'Status: ${response.statusCode}\n'
-      'URL: ${response.requestOptions.uri}\n'
+      'URL: ${_sanitizeUri(response.requestOptions.uri)}\n'
       'Headers: ${_sanitizeHeaders(response.headers.map)}\n'
       'Response: ${_sanitize(response.data)}',
     );
@@ -80,7 +80,7 @@ class _SafeDioLogInterceptor extends Interceptor {
     _log(
       '[DIO ERROR]\n'
       'Method: ${err.requestOptions.method}\n'
-      'URL: ${err.requestOptions.uri}\n'
+      'URL: ${_sanitizeUri(err.requestOptions.uri)}\n'
       'Status: ${response?.statusCode}\n'
       'Query: ${_sanitize(err.requestOptions.queryParameters)}\n'
       'Headers: ${_sanitizeHeaders(err.requestOptions.headers)}\n'
@@ -101,6 +101,20 @@ class _SafeDioLogInterceptor extends Interceptor {
           lowerKey.contains('cookie');
       return MapEntry(key, isSensitive ? '[REDACTED]' : _sanitize(value));
     });
+  }
+
+  String _sanitizeUri(Uri uri) {
+    final value = uri.toString();
+    var end = value.length;
+    final queryStart = value.indexOf('?');
+    if (queryStart != -1 && queryStart < end) {
+      end = queryStart;
+    }
+    final fragmentStart = value.indexOf('#');
+    if (fragmentStart != -1 && fragmentStart < end) {
+      end = fragmentStart;
+    }
+    return value.substring(0, end);
   }
 
   Object? _sanitize(Object? value) {
