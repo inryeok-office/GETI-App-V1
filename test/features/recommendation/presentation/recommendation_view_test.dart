@@ -2,6 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:geti_app/core/network/rest_client.dart';
+import 'package:geti_app/features/recommendation/data/dto/recommendation_exclusion_list_response.dart';
+import 'package:geti_app/features/recommendation/data/dto/recommendation_list_response.dart';
+import 'package:geti_app/features/recommendation/data/recommendation_repository.dart';
 import 'package:geti_app/features/recommendation/presentation/view/recommendation_view.dart';
 import 'package:geti_app/features/recommendation/presentation/view_model/recommendation_view_model.dart';
 import 'package:geti_app/features/recommendation/presentation/view_model/suitability_level.dart';
@@ -24,10 +28,24 @@ void main() {
       '적합',
       '매우 적합',
     ]);
+    expect(
+      suitabilityLevelFromApi('VERY_UNSUITABLE'),
+      SuitabilityLevel.veryUnsuitable,
+    );
+    expect(suitabilityLevelFromApi('UNSUITABLE'), SuitabilityLevel.unsuitable);
+    expect(suitabilityLevelFromApi('NORMAL'), SuitabilityLevel.normal);
+    expect(
+      suitabilityLevelFromApi('RECOMMENDED'),
+      SuitabilityLevel.recommended,
+    );
+    expect(
+      suitabilityLevelFromApi('HIGHLY_RECOMMENDED'),
+      SuitabilityLevel.highlyRecommended,
+    );
   });
 
   test('추천 생성 액션은 생성 중 상태로 전환한다', () {
-    final container = ProviderContainer();
+    final container = _containerFor(status: 'EMPTY');
     addTearDown(container.dispose);
 
     container.read(recommendationViewModelProvider.notifier).startGeneration();
@@ -36,6 +54,221 @@ void main() {
       container.read(recommendationViewModelProvider).status,
       RecommendationStatus.generating,
     );
+  });
+
+  test('서버 status는 content 비어 있음 여부가 아니라 status 값으로 매핑한다', () async {
+    final cases = {
+      'DISABLED': RecommendationStatus.disabled,
+      'GENERATING': RecommendationStatus.generating,
+      'FAILED': RecommendationStatus.failure,
+      'EMPTY': RecommendationStatus.empty,
+      'READY': RecommendationStatus.loaded,
+    };
+
+    for (final entry in cases.entries) {
+      final container = _containerFor(status: entry.key);
+      addTearDown(container.dispose);
+
+      await container.read(recommendationViewModelProvider.notifier).retry();
+      final state = container.read(recommendationViewModelProvider);
+
+      expect(state.status, entry.value);
+      expect(state.serverStatus, entry.key);
+      expect(state.page, 0);
+      expect(state.size, 20);
+      expect(state.first, isTrue);
+      expect(state.last, isTrue);
+    }
+  });
+
+  test(
+    'READY response maps to existing recommendation card model safely',
+    () async {
+      final container = _containerFor(
+        status: 'READY',
+        content: [_recommendationItem()],
+      );
+      addTearDown(container.dispose);
+
+      await container.read(recommendationViewModelProvider.notifier).retry();
+      final state = container.read(recommendationViewModelProvider);
+      final job = state.jobs.single;
+
+      expect(state.status, RecommendationStatus.loaded);
+      expect(job.companyName, 'GETI');
+      expect(job.positionName, 'Backend Engineer');
+      expect(job.summary, isNull);
+      expect(job.matchReason, isNull);
+      expect(job.tags, ['Dart', 'Flutter']);
+      expect(job.availability, RecommendationJobAvailability.active);
+      expect(job.suitabilityLevel, SuitabilityLevel.highlyRecommended);
+      expect(state.bookmarkedJobs.contains(job), isTrue);
+      expect(state.totalElements, 1);
+      expect(state.totalPages, 1);
+    },
+  );
+
+  test('관심 없음 목록을 jobId로 추천 카드 상태에 연결한다', () async {
+    final container = _containerFor(
+      status: 'READY',
+      content: [_recommendationItem()],
+      exclusions: [_recommendationExclusion(type: 'SIMILAR_JOBS')],
+    );
+    addTearDown(container.dispose);
+
+    await container.read(recommendationViewModelProvider.notifier).retry();
+    final state = container.read(recommendationViewModelProvider);
+    final job = state.jobs.single;
+
+    expect(state.uninterestedJobIds, {10});
+    expect(state.recommendationExclusions.single.exclusionId, 31);
+    expect(state.exclusionPage, 0);
+    expect(state.exclusionSize, 20);
+    expect(state.exclusionTotalElements, 1);
+    expect(state.exclusionTotalPages, 1);
+    expect(state.exclusionFirst, isTrue);
+    expect(state.exclusionLast, isTrue);
+
+    container
+        .read(recommendationViewModelProvider.notifier)
+        .openUninterested(job);
+    final updatedState = container.read(recommendationViewModelProvider);
+    expect(
+      updatedState.uninterestedSheetStatus,
+      UninterestedSheetStatus.unsetting,
+    );
+    expect(updatedState.uninterestedScope, UninterestedScope.similarJobs);
+  });
+
+  test('loadNextPage appends next recommendation page', () async {
+    final client = _FakeRestClient(
+      responseByPage: {
+        0: ApiResponseRecommendationListResponse(
+          success: true,
+          data: _recommendationList(
+            status: 'READY',
+            content: [_recommendationItem(jobId: 10)],
+            page: 0,
+            totalElements: 2,
+            totalPages: 2,
+            first: true,
+            last: false,
+          ),
+        ),
+        1: ApiResponseRecommendationListResponse(
+          success: true,
+          data: _recommendationList(
+            status: 'READY',
+            content: [_recommendationItem(jobId: 11)],
+            page: 1,
+            totalElements: 2,
+            totalPages: 2,
+            first: false,
+            last: true,
+          ),
+        ),
+      },
+    );
+    final container = ProviderContainer(
+      overrides: [
+        recommendationRepositoryProvider.overrideWithValue(
+          RecommendationRepository(client),
+        ),
+      ],
+    );
+    addTearDown(container.dispose);
+
+    final viewModel = container.read(recommendationViewModelProvider.notifier);
+    await viewModel.retry();
+    await viewModel.loadNextPage();
+    final state = container.read(recommendationViewModelProvider);
+
+    expect(state.jobs.map((job) => job.jobId), [10, 11]);
+    expect(state.page, 1);
+    expect(state.last, isTrue);
+    expect(client.requestedPages, [0, 1]);
+  });
+
+  test('multiple exclusion pages are merged before restoring state', () async {
+    final client = _FakeRestClient(
+      response: ApiResponseRecommendationListResponse(
+        success: true,
+        data: _recommendationList(
+          status: 'READY',
+          content: [
+            _recommendationItem(jobId: 10),
+            _recommendationItem(jobId: 11),
+          ],
+        ),
+      ),
+      exclusionResponseByPage: {
+        0: ApiResponseRecommendationExclusionListResponse(
+          success: true,
+          data: _recommendationExclusionList(
+            content: [_recommendationExclusion(jobId: 10, type: 'THIS_JOB')],
+            page: 0,
+            totalElements: 2,
+            totalPages: 2,
+            first: true,
+            last: false,
+          ),
+        ),
+        1: ApiResponseRecommendationExclusionListResponse(
+          success: true,
+          data: _recommendationExclusionList(
+            content: [
+              _recommendationExclusion(jobId: 11, type: 'SIMILAR_JOBS'),
+            ],
+            page: 1,
+            totalElements: 2,
+            totalPages: 2,
+            first: false,
+            last: true,
+          ),
+        ),
+      },
+    );
+    final container = ProviderContainer(
+      overrides: [
+        recommendationRepositoryProvider.overrideWithValue(
+          RecommendationRepository(client),
+        ),
+      ],
+    );
+    addTearDown(container.dispose);
+
+    await container.read(recommendationViewModelProvider.notifier).retry();
+    final state = container.read(recommendationViewModelProvider);
+
+    expect(state.uninterestedJobIds, {10, 11});
+    expect(state.recommendationExclusions.length, 2);
+    expect(state.exclusionPage, 1);
+    expect(state.exclusionLast, isTrue);
+    expect(client.exclusionRequestedPages, [0, 1]);
+  });
+
+  test('API error maps to existing failure state', () async {
+    final container = _containerForError();
+    addTearDown(container.dispose);
+
+    await container.read(recommendationViewModelProvider.notifier).retry();
+
+    expect(
+      container.read(recommendationViewModelProvider).status,
+      RecommendationStatus.failure,
+    );
+  });
+
+  test('exclusion API error keeps successful recommendation result', () async {
+    final container = _containerForExclusionError();
+    addTearDown(container.dispose);
+
+    await container.read(recommendationViewModelProvider.notifier).retry();
+    final state = container.read(recommendationViewModelProvider);
+
+    expect(state.status, RecommendationStatus.loaded);
+    expect(state.jobs, isEmpty);
+    expect(state.uninterestedJobIds, isEmpty);
   });
 
   testWidgets('추천 결과 없음 상태를 표시한다', (tester) async {
@@ -89,6 +322,7 @@ void main() {
   testWidgets('마감 및 접근 불가 Job Card를 표시한다', (tester) async {
     const jobs = [
       RecommendationJob(
+        jobId: 1,
         companyName: '네이버클라우드',
         positionName: 'Cloud Platform Engineer',
         summary: '분당 · 정규직 · D-18',
@@ -96,6 +330,7 @@ void main() {
         availability: RecommendationJobAvailability.closed,
       ),
       RecommendationJob(
+        jobId: 2,
         companyName: '네이버클라우드',
         positionName: 'Cloud Platform Engineer',
         summary: '분당 · 정규직 · D-18',
@@ -124,6 +359,7 @@ void main() {
   testWidgets('Figma 근거가 있는 추천 적합도 문구만 표시한다', (tester) async {
     const jobs = [
       RecommendationJob(
+        jobId: 3,
         companyName: '회사 A',
         positionName: '매우 추천 공고',
         summary: '서울 · 정규직 · D-10',
@@ -132,6 +368,7 @@ void main() {
         suitabilityLevel: SuitabilityLevel.highlyRecommended,
       ),
       RecommendationJob(
+        jobId: 4,
         companyName: '회사 B',
         positionName: '추천 공고',
         summary: '서울 · 정규직 · D-10',
@@ -140,6 +377,7 @@ void main() {
         suitabilityLevel: SuitabilityLevel.recommended,
       ),
       RecommendationJob(
+        jobId: 5,
         companyName: '회사 C',
         positionName: '비추천 공고',
         summary: '서울 · 정규직 · D-10',
@@ -164,6 +402,210 @@ void main() {
     expect(find.text('보통'), findsNothing);
     expect(tester.takeException(), isNull);
   });
+}
+
+ProviderContainer _containerFor({
+  required String status,
+  List<RecommendationItemResponse> content = const [],
+  List<RecommendationExclusionResponse> exclusions = const [],
+}) {
+  return ProviderContainer(
+    overrides: [
+      recommendationRepositoryProvider.overrideWithValue(
+        RecommendationRepository(
+          _FakeRestClient(
+            response: ApiResponseRecommendationListResponse(
+              success: true,
+              data: _recommendationList(status: status, content: content),
+            ),
+            exclusionResponse: ApiResponseRecommendationExclusionListResponse(
+              success: true,
+              data: _recommendationExclusionList(content: exclusions),
+            ),
+          ),
+        ),
+      ),
+    ],
+  );
+}
+
+ProviderContainer _containerForError() {
+  return ProviderContainer(
+    overrides: [
+      recommendationRepositoryProvider.overrideWithValue(
+        RecommendationRepository(_FakeRestClient(error: Exception('network'))),
+      ),
+    ],
+  );
+}
+
+ProviderContainer _containerForExclusionError() {
+  return ProviderContainer(
+    overrides: [
+      recommendationRepositoryProvider.overrideWithValue(
+        RecommendationRepository(
+          _FakeRestClient(
+            response: ApiResponseRecommendationListResponse(
+              success: true,
+              data: _recommendationList(status: 'READY', content: const []),
+            ),
+            exclusionError: Exception('network'),
+          ),
+        ),
+      ),
+    ],
+  );
+}
+
+RecommendationListResponse _recommendationList({
+  required String status,
+  required List<RecommendationItemResponse> content,
+  int page = 0,
+  int totalElements = -1,
+  int totalPages = -1,
+  bool first = true,
+  bool last = true,
+}) {
+  return RecommendationListResponse(
+    enabled: status != 'DISABLED',
+    status: status,
+    generatedAt: null,
+    nextGenerationAt: null,
+    content: content,
+    page: page,
+    size: 20,
+    totalElements: totalElements < 0 ? content.length : totalElements,
+    totalPages: totalPages < 0 ? (content.isEmpty ? 0 : 1) : totalPages,
+    first: first,
+    last: last,
+  );
+}
+
+RecommendationExclusionListResponse _recommendationExclusionList({
+  required List<RecommendationExclusionResponse> content,
+  int page = 0,
+  int totalElements = -1,
+  int totalPages = -1,
+  bool first = true,
+  bool last = true,
+}) {
+  return RecommendationExclusionListResponse(
+    content: content,
+    page: page,
+    size: 20,
+    totalElements: totalElements < 0 ? content.length : totalElements,
+    totalPages: totalPages < 0 ? (content.isEmpty ? 0 : 1) : totalPages,
+    first: first,
+    last: last,
+  );
+}
+
+RecommendationItemResponse _recommendationItem({int jobId = 10}) {
+  return RecommendationItemResponse(
+    recommendationId: jobId,
+    job: RecommendationJobResponse(
+      jobId: jobId,
+      title: 'Backend Engineer',
+      postingType: 'GENERAL',
+      applicationMethod: 'INTERNAL',
+      status: 'PUBLISHED',
+      company: RecommendationCompanySummaryResponse(
+        companyId: 1,
+        name: 'GETI',
+        logoUrl: null,
+      ),
+      endDate: null,
+      viewCount: 12,
+      bookmarked: true,
+      techStacks: [
+        RecommendationTechStackResponse(techStackId: 1, name: 'Dart'),
+        RecommendationTechStackResponse(techStackId: 2, name: 'Flutter'),
+      ],
+      bookmarkCount: 3,
+    ),
+    score: 93,
+    suitabilityLevel: 'HIGHLY_RECOMMENDED',
+    rank: 1,
+    reasons: const [
+      RecommendationReasonResponse(
+        type: 'REQUIRED_SKILL_MATCH',
+        matchedCount: 2,
+        totalCount: 3,
+      ),
+    ],
+    generatedAt: DateTime.utc(2026, 9, 2, 9),
+  );
+}
+
+RecommendationExclusionResponse _recommendationExclusion({
+  int jobId = 10,
+  required String type,
+}) {
+  return RecommendationExclusionResponse(
+    exclusionId: 31,
+    job: _recommendationItem(jobId: jobId).job,
+    exclusionType: type,
+    createdAt: DateTime.utc(2026, 9, 3, 9),
+  );
+}
+
+class _FakeRestClient implements RestClient {
+  _FakeRestClient({
+    this.response,
+    this.responseByPage = const {},
+    this.exclusionResponse,
+    this.exclusionResponseByPage = const {},
+    this.error,
+    this.exclusionError,
+  });
+
+  final ApiResponseRecommendationListResponse? response;
+  final Map<int, ApiResponseRecommendationListResponse> responseByPage;
+  final ApiResponseRecommendationExclusionListResponse? exclusionResponse;
+  final Map<int, ApiResponseRecommendationExclusionListResponse>
+  exclusionResponseByPage;
+  final Object? error;
+  final Object? exclusionError;
+  final requestedPages = <int>[];
+  final exclusionRequestedPages = <int>[];
+
+  @override
+  Future<ApiResponseRecommendationListResponse> getMyRecommendations({
+    String? suitabilityLevel,
+    int page = 0,
+    int size = 20,
+  }) async {
+    requestedPages.add(page);
+    final error = this.error;
+    if (error != null) throw error;
+    return responseByPage[page] ?? response!;
+  }
+
+  @override
+  Future<ApiResponseRecommendationExclusionListResponse>
+  getRecommendationExclusions({
+    String? exclusionType,
+    int page = 0,
+    int size = 20,
+  }) async {
+    exclusionRequestedPages.add(page);
+    final error = exclusionError;
+    if (error != null) throw error;
+    return exclusionResponseByPage[page] ??
+        exclusionResponse ??
+        const ApiResponseRecommendationExclusionListResponse(
+          success: true,
+          data: RecommendationExclusionListResponse(
+            content: [],
+            page: 0,
+            size: 20,
+            totalElements: 0,
+            totalPages: 0,
+            first: true,
+            last: true,
+          ),
+        );
+  }
 }
 
 Future<void> _pumpState(

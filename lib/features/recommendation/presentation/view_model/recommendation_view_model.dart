@@ -1,5 +1,8 @@
 import 'dart:async';
 
+import 'package:geti_app/features/recommendation/data/dto/recommendation_exclusion_list_response.dart';
+import 'package:geti_app/features/recommendation/data/dto/recommendation_list_response.dart';
+import 'package:geti_app/features/recommendation/data/recommendation_repository.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import 'suitability_level.dart';
@@ -12,6 +15,7 @@ enum RecommendationStatus {
   beforeGeneration,
   generating,
   failure,
+  disabled,
 }
 
 enum RecommendationJobAvailability { active, closed, unavailable }
@@ -31,18 +35,20 @@ enum UninterestedSheetStatus {
 
 class RecommendationJob {
   const RecommendationJob({
+    required this.jobId,
     required this.companyName,
     required this.positionName,
-    required this.summary,
     required this.tags,
     required this.availability,
+    this.summary,
     this.suitabilityLevel,
     this.matchReason,
   });
 
+  final int jobId;
   final String companyName;
   final String positionName;
-  final String summary;
+  final String? summary;
   final List<String> tags;
   final RecommendationJobAvailability availability;
   final SuitabilityLevel? suitabilityLevel;
@@ -56,10 +62,28 @@ class RecommendationViewState {
     this.uninterestedSheetStatus = UninterestedSheetStatus.hidden,
     this.uninterestedScope = UninterestedScope.currentJob,
     this.selectedJob,
-    this.uninterestedJobs = const {},
+    this.uninterestedJobIds = const {},
+    this.recommendationExclusions = const [],
     this.showUninterestedSuccess = false,
     this.isUnsetting = false,
     this.bookmarkedJobs = const {},
+    this.isLoadingNextPage = false,
+    this.enabled,
+    this.serverStatus,
+    this.generatedAt,
+    this.nextGenerationAt,
+    this.page = 0,
+    this.size = 20,
+    this.totalElements = 0,
+    this.totalPages = 0,
+    this.first = true,
+    this.last = true,
+    this.exclusionPage = 0,
+    this.exclusionSize = 20,
+    this.exclusionTotalElements = 0,
+    this.exclusionTotalPages = 0,
+    this.exclusionFirst = true,
+    this.exclusionLast = true,
   });
 
   final RecommendationStatus status;
@@ -67,10 +91,28 @@ class RecommendationViewState {
   final UninterestedSheetStatus uninterestedSheetStatus;
   final UninterestedScope uninterestedScope;
   final RecommendationJob? selectedJob;
-  final Set<RecommendationJob> uninterestedJobs;
+  final Set<int> uninterestedJobIds;
+  final List<RecommendationExclusionResponse> recommendationExclusions;
   final bool showUninterestedSuccess;
   final bool isUnsetting;
   final Set<RecommendationJob> bookmarkedJobs;
+  final bool isLoadingNextPage;
+  final bool? enabled;
+  final String? serverStatus;
+  final DateTime? generatedAt;
+  final DateTime? nextGenerationAt;
+  final int page;
+  final int size;
+  final int totalElements;
+  final int totalPages;
+  final bool first;
+  final bool last;
+  final int exclusionPage;
+  final int exclusionSize;
+  final int exclusionTotalElements;
+  final int exclusionTotalPages;
+  final bool exclusionFirst;
+  final bool exclusionLast;
 
   RecommendationViewState copyWith({
     RecommendationStatus? status,
@@ -78,10 +120,28 @@ class RecommendationViewState {
     UninterestedSheetStatus? uninterestedSheetStatus,
     UninterestedScope? uninterestedScope,
     RecommendationJob? selectedJob,
-    Set<RecommendationJob>? uninterestedJobs,
+    Set<int>? uninterestedJobIds,
+    List<RecommendationExclusionResponse>? recommendationExclusions,
     bool? showUninterestedSuccess,
     bool? isUnsetting,
     Set<RecommendationJob>? bookmarkedJobs,
+    bool? isLoadingNextPage,
+    bool? enabled,
+    String? serverStatus,
+    DateTime? generatedAt,
+    DateTime? nextGenerationAt,
+    int? page,
+    int? size,
+    int? totalElements,
+    int? totalPages,
+    bool? first,
+    bool? last,
+    int? exclusionPage,
+    int? exclusionSize,
+    int? exclusionTotalElements,
+    int? exclusionTotalPages,
+    bool? exclusionFirst,
+    bool? exclusionLast,
   }) {
     return RecommendationViewState(
       status: status ?? this.status,
@@ -90,24 +150,214 @@ class RecommendationViewState {
           uninterestedSheetStatus ?? this.uninterestedSheetStatus,
       uninterestedScope: uninterestedScope ?? this.uninterestedScope,
       selectedJob: selectedJob ?? this.selectedJob,
-      uninterestedJobs: uninterestedJobs ?? this.uninterestedJobs,
+      uninterestedJobIds: uninterestedJobIds ?? this.uninterestedJobIds,
+      recommendationExclusions:
+          recommendationExclusions ?? this.recommendationExclusions,
       showUninterestedSuccess:
           showUninterestedSuccess ?? this.showUninterestedSuccess,
       isUnsetting: isUnsetting ?? this.isUnsetting,
       bookmarkedJobs: bookmarkedJobs ?? this.bookmarkedJobs,
+      isLoadingNextPage: isLoadingNextPage ?? this.isLoadingNextPage,
+      enabled: enabled ?? this.enabled,
+      serverStatus: serverStatus ?? this.serverStatus,
+      generatedAt: generatedAt ?? this.generatedAt,
+      nextGenerationAt: nextGenerationAt ?? this.nextGenerationAt,
+      page: page ?? this.page,
+      size: size ?? this.size,
+      totalElements: totalElements ?? this.totalElements,
+      totalPages: totalPages ?? this.totalPages,
+      first: first ?? this.first,
+      last: last ?? this.last,
+      exclusionPage: exclusionPage ?? this.exclusionPage,
+      exclusionSize: exclusionSize ?? this.exclusionSize,
+      exclusionTotalElements:
+          exclusionTotalElements ?? this.exclusionTotalElements,
+      exclusionTotalPages: exclusionTotalPages ?? this.exclusionTotalPages,
+      exclusionFirst: exclusionFirst ?? this.exclusionFirst,
+      exclusionLast: exclusionLast ?? this.exclusionLast,
     );
   }
 }
 
+const _recommendationPage = 0;
+const _recommendationPageSize = 20;
+const _recommendationExclusionPage = 0;
+const _recommendationExclusionPageSize = 20;
+
 @riverpod
 class RecommendationViewModel extends _$RecommendationViewModel {
   int _successNoticeVersion = 0;
+  int _requestVersion = 0;
 
   @override
-  RecommendationViewState build() => const RecommendationViewState(
-    status: RecommendationStatus.loaded,
-    jobs: _mockJobs,
-  );
+  RecommendationViewState build() {
+    final requestVersion = _nextRequestVersion();
+    unawaited(
+      Future.microtask(
+        () => _fetchRecommendations(requestVersion: requestVersion),
+      ),
+    );
+    return const RecommendationViewState(
+      status: RecommendationStatus.generating,
+    );
+  }
+
+  Future<void> retry() {
+    return _fetchRecommendations(requestVersion: _nextRequestVersion());
+  }
+
+  int _nextRequestVersion() => ++_requestVersion;
+
+  Future<void> _fetchRecommendations({required int requestVersion}) async {
+    if (requestVersion != _requestVersion) return;
+    state = state.copyWith(
+      status: RecommendationStatus.generating,
+      jobs: const [],
+      uninterestedJobIds: const <int>{},
+      recommendationExclusions: const [],
+      bookmarkedJobs: const <RecommendationJob>{},
+      isLoadingNextPage: false,
+    );
+
+    try {
+      final repository = ref.read(recommendationRepositoryProvider);
+      final response = await repository.getMyRecommendations(
+        page: _recommendationPage,
+        size: _recommendationPageSize,
+      );
+      if (!ref.mounted || requestVersion != _requestVersion) return;
+
+      _applyRecommendationResponse(
+        response: response,
+        append: false,
+        exclusions: const [],
+      );
+
+      final exclusionResponse = await _fetchAllRecommendationExclusions(
+        repository,
+      );
+      if (!ref.mounted || requestVersion != _requestVersion) return;
+      if (exclusionResponse != null) {
+        _applyExclusionResponse(exclusionResponse);
+      }
+    } catch (_) {
+      if (!ref.mounted || requestVersion != _requestVersion) return;
+      state = state.copyWith(status: RecommendationStatus.failure);
+    }
+  }
+
+  Future<void> loadNextPage() async {
+    if (state.status != RecommendationStatus.loaded ||
+        state.last ||
+        state.isLoadingNextPage) {
+      return;
+    }
+
+    final requestVersion = _requestVersion;
+    state = state.copyWith(isLoadingNextPage: true);
+
+    try {
+      final response = await ref
+          .read(recommendationRepositoryProvider)
+          .getMyRecommendations(page: state.page + 1, size: state.size);
+      if (!ref.mounted || requestVersion != _requestVersion) return;
+
+      _applyRecommendationResponse(
+        response: response,
+        append: true,
+        exclusions: state.recommendationExclusions,
+      );
+    } catch (_) {
+      if (!ref.mounted || requestVersion != _requestVersion) return;
+      state = state.copyWith(isLoadingNextPage: false);
+    }
+  }
+
+  void _applyRecommendationResponse({
+    required RecommendationListResponse response,
+    required bool append,
+    required List<RecommendationExclusionResponse> exclusions,
+  }) {
+    final nextJobs = response.status == 'READY'
+        ? response.content
+              .map(recommendationJobFromItem)
+              .toList(growable: false)
+        : const <RecommendationJob>[];
+    final jobs = append ? [...state.jobs, ...nextJobs] : nextJobs;
+    final bookmarkedJobs = <RecommendationJob>{
+      if (append) ...state.bookmarkedJobs,
+      for (var i = 0; i < response.content.length && i < nextJobs.length; i++)
+        if (response.content[i].job.bookmarked) nextJobs[i],
+    };
+
+    state = state.copyWith(
+      status: recommendationStatusFromApi(response.status),
+      jobs: jobs,
+      bookmarkedJobs: bookmarkedJobs,
+      enabled: response.enabled,
+      serverStatus: response.status,
+      generatedAt: response.generatedAt,
+      nextGenerationAt: response.nextGenerationAt,
+      page: response.page,
+      size: response.size,
+      totalElements: response.totalElements,
+      totalPages: response.totalPages,
+      first: response.first,
+      last: response.last,
+      isLoadingNextPage: false,
+      uninterestedJobIds: exclusions
+          .map((exclusion) => exclusion.job.jobId)
+          .toSet(),
+      recommendationExclusions: exclusions,
+    );
+  }
+
+  Future<RecommendationExclusionListResponse?>
+  _fetchAllRecommendationExclusions(RecommendationRepository repository) async {
+    try {
+      final responses = <RecommendationExclusionListResponse>[];
+      var page = _recommendationExclusionPage;
+      while (true) {
+        final response = await repository.getRecommendationExclusions(
+          page: page,
+          size: _recommendationExclusionPageSize,
+        );
+        responses.add(response);
+        if (response.last) break;
+        page = response.page + 1;
+      }
+
+      final lastResponse = responses.last;
+      return RecommendationExclusionListResponse(
+        content: responses
+            .expand((response) => response.content)
+            .toList(growable: false),
+        page: lastResponse.page,
+        size: lastResponse.size,
+        totalElements: lastResponse.totalElements,
+        totalPages: lastResponse.totalPages,
+        first: responses.first.first,
+        last: lastResponse.last,
+      );
+    } catch (_) {
+      return null;
+    }
+  }
+
+  void _applyExclusionResponse(RecommendationExclusionListResponse response) {
+    state = state.copyWith(
+      uninterestedJobIds: response.content
+          .map((exclusion) => exclusion.job.jobId)
+          .toSet(),
+      recommendationExclusions: response.content,
+      exclusionPage: response.page,
+      exclusionSize: response.size,
+      exclusionTotalElements: response.totalElements,
+      exclusionTotalPages: response.totalPages,
+      exclusionFirst: response.first,
+      exclusionLast: response.last,
+    );
+  }
 
   void startGeneration() {
     state = const RecommendationViewState(
@@ -124,10 +374,14 @@ class RecommendationViewModel extends _$RecommendationViewModel {
   }
 
   void openUninterested(RecommendationJob job) {
-    final isUnsetting = state.uninterestedJobs.contains(job);
+    final isUnsetting = state.uninterestedJobIds.contains(job.jobId);
+    final exclusionType = _exclusionTypeForJob(
+      state.recommendationExclusions,
+      job.jobId,
+    );
     state = state.copyWith(
       selectedJob: job,
-      uninterestedScope: UninterestedScope.currentJob,
+      uninterestedScope: uninterestedScopeFromApi(exclusionType),
       uninterestedSheetStatus: isUnsetting
           ? UninterestedSheetStatus.unsetting
           : UninterestedSheetStatus.selecting,
@@ -170,7 +424,7 @@ class RecommendationViewModel extends _$RecommendationViewModel {
 
     state = state.copyWith(
       uninterestedSheetStatus: UninterestedSheetStatus.hidden,
-      uninterestedJobs: {...state.uninterestedJobs, job},
+      uninterestedJobIds: {...state.uninterestedJobIds, job.jobId},
       showUninterestedSuccess: true,
     );
     _scheduleSuccessNoticeDismissal();
@@ -192,10 +446,13 @@ class RecommendationViewModel extends _$RecommendationViewModel {
       return;
     }
 
-    final updatedJobs = {...state.uninterestedJobs}..remove(job);
+    final updatedJobIds = {...state.uninterestedJobIds}..remove(job.jobId);
     state = state.copyWith(
       uninterestedSheetStatus: UninterestedSheetStatus.hidden,
-      uninterestedJobs: updatedJobs,
+      uninterestedJobIds: updatedJobIds,
+      recommendationExclusions: state.recommendationExclusions
+          .where((exclusion) => exclusion.job.jobId != job.jobId)
+          .toList(growable: false),
     );
   }
 
@@ -229,8 +486,65 @@ class RecommendationViewModel extends _$RecommendationViewModel {
   }
 }
 
-const _mockJobs = [
+RecommendationStatus recommendationStatusFromApi(String raw) => switch (raw) {
+  'DISABLED' => RecommendationStatus.disabled,
+  'GENERATING' => RecommendationStatus.generating,
+  'FAILED' => RecommendationStatus.failure,
+  'EMPTY' => RecommendationStatus.empty,
+  'READY' => RecommendationStatus.loaded,
+  _ => RecommendationStatus.failure,
+};
+
+UninterestedScope uninterestedScopeFromApi(String? raw) => switch (raw) {
+  'SIMILAR_JOBS' => UninterestedScope.similarJobs,
+  _ => UninterestedScope.currentJob,
+};
+
+String? _exclusionTypeForJob(
+  List<RecommendationExclusionResponse> exclusions,
+  int jobId,
+) {
+  for (final exclusion in exclusions) {
+    if (exclusion.job.jobId == jobId) {
+      return exclusion.exclusionType;
+    }
+  }
+  return null;
+}
+
+RecommendationJob recommendationJobFromItem(RecommendationItemResponse item) {
+  final job = item.job;
+  return RecommendationJob(
+    jobId: job.jobId,
+    companyName: _textOrFallback(job.company?.name, '기업명 미정'),
+    positionName: job.title,
+    summary: null,
+    tags: job.techStacks
+        .map((techStack) => techStack.name.trim())
+        .where((name) => name.isNotEmpty)
+        .toList(growable: false),
+    availability: recommendationJobAvailabilityFromApi(job.status),
+    suitabilityLevel: suitabilityLevelFromApi(item.suitabilityLevel),
+    matchReason: null,
+  );
+}
+
+RecommendationJobAvailability recommendationJobAvailabilityFromApi(
+  String raw,
+) => switch (raw) {
+  'CLOSED' => RecommendationJobAvailability.closed,
+  'DELETED' => RecommendationJobAvailability.unavailable,
+  _ => RecommendationJobAvailability.active,
+};
+
+String _textOrFallback(String? value, String fallback) {
+  final trimmed = value?.trim();
+  return trimmed == null || trimmed.isEmpty ? fallback : trimmed;
+}
+
+const mockRecommendationJobs = [
   RecommendationJob(
+    jobId: 1,
     companyName: '네이버클라우드',
     positionName: 'Cloud Platform Engineer',
     summary: '분당 · 정규직 · D-18',
@@ -240,6 +554,7 @@ const _mockJobs = [
     matchReason: 'React, TypeScript 기술 스택과 일치합니다.',
   ),
   RecommendationJob(
+    jobId: 2,
     companyName: '네이버클라우드',
     positionName: 'Cloud Platform Engineer',
     summary: '분당 · 정규직 · D-18',
@@ -249,6 +564,7 @@ const _mockJobs = [
     matchReason: 'React, TypeScript 기술 스택과 일치합니다.',
   ),
   RecommendationJob(
+    jobId: 3,
     companyName: '네이버클라우드',
     positionName: 'Cloud Platform Engineer',
     summary: '분당 · 정규직 · D-18',
@@ -258,6 +574,7 @@ const _mockJobs = [
     matchReason: 'React, TypeScript 기술 스택과 일치합니다.',
   ),
   RecommendationJob(
+    jobId: 4,
     companyName: '네이버클라우드',
     positionName: 'Cloud Platform Engineer',
     summary: '분당 · 정규직 · D-18',
@@ -267,6 +584,7 @@ const _mockJobs = [
     matchReason: 'React, TypeScript 기술 스택과 일치합니다.',
   ),
   RecommendationJob(
+    jobId: 5,
     companyName: '네이버클라우드',
     positionName: 'Cloud Platform Engineer',
     summary: '분당 · 정규직 · D-18',
@@ -274,6 +592,7 @@ const _mockJobs = [
     availability: RecommendationJobAvailability.closed,
   ),
   RecommendationJob(
+    jobId: 6,
     companyName: '네이버클라우드',
     positionName: 'Cloud Platform Engineer',
     summary: '분당 · 정규직 · D-18',

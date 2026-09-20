@@ -49,9 +49,10 @@ class _RecommendationViewState extends ConsumerState<RecommendationView> {
                   child: RecommendationScreenBody(
                     state: state,
                     onGenerate: viewModel.startGeneration,
-                    onRetry: viewModel.startGeneration,
+                    onRetry: viewModel.retry,
                     onUninterested: _showUninterestedSheet,
                     onBookmark: viewModel.toggleBookmark,
+                    onLoadNextPage: viewModel.loadNextPage,
                   ),
                 ),
               ],
@@ -132,6 +133,7 @@ class RecommendationScreenBody extends StatelessWidget {
     required this.onRetry,
     this.onUninterested,
     this.onBookmark,
+    this.onLoadNextPage,
     super.key,
   });
 
@@ -140,9 +142,14 @@ class RecommendationScreenBody extends StatelessWidget {
   final VoidCallback onRetry;
   final ValueChanged<RecommendationJob>? onUninterested;
   final ValueChanged<RecommendationJob>? onBookmark;
+  final VoidCallback? onLoadNextPage;
 
   @override
   Widget build(BuildContext context) {
+    if (state.status == RecommendationStatus.disabled) {
+      return const SizedBox.shrink();
+    }
+
     if (state.status != RecommendationStatus.loaded) {
       return RecommendationStateContent(
         status: state.status,
@@ -151,32 +158,61 @@ class RecommendationScreenBody extends StatelessWidget {
       );
     }
 
-    return Center(
-      child: SizedBox(
-        width: 326.w,
-        child: ListView.separated(
-          padding: EdgeInsets.symmetric(vertical: 24.h),
-          itemCount: state.jobs.length + 1,
-          separatorBuilder: (context, index) => SizedBox(height: 12.h),
-          itemBuilder: (context, index) {
-            if (index == 0) {
-              return Text(
-                '추천 공고 ${state.jobs.length}개',
-                style: AppTypography.body.copyWith(color: AppColors.neutral900),
-              );
-            }
+    return NotificationListener<ScrollNotification>(
+      onNotification: (notification) {
+        final onLoadNextPage = this.onLoadNextPage;
+        if (onLoadNextPage == null ||
+            state.last ||
+            state.isLoadingNextPage ||
+            notification.metrics.extentAfter > 200) {
+          return false;
+        }
+        onLoadNextPage();
+        return false;
+      },
+      child: Center(
+        child: SizedBox(
+          width: 326.w,
+          child: ListView.separated(
+            padding: EdgeInsets.symmetric(vertical: 24.h),
+            itemCount:
+                state.jobs.length + 1 + (state.isLoadingNextPage ? 1 : 0),
+            separatorBuilder: (context, index) => SizedBox(height: 12.h),
+            itemBuilder: (context, index) {
+              if (index == 0) {
+                return Text(
+                  '추천 공고 ${state.jobs.length}개',
+                  style: AppTypography.body.copyWith(
+                    color: AppColors.neutral900,
+                  ),
+                );
+              }
 
-            final job = state.jobs[index - 1];
-            return RecommendationJobCard(
-              job: job,
-              isUninterested: state.uninterestedJobs.contains(job),
-              isBookmarked: state.bookmarkedJobs.contains(job),
-              onBookmarkTap: onBookmark == null ? null : () => onBookmark!(job),
-              onUninterestedTap: onUninterested == null
-                  ? null
-                  : () => onUninterested!(job),
-            );
-          },
+              final jobIndex = index - 1;
+              if (jobIndex >= state.jobs.length) {
+                return const Center(
+                  child: SizedBox(
+                    width: 24,
+                    height: 24,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  ),
+                );
+              }
+
+              final job = state.jobs[jobIndex];
+              return RecommendationJobCard(
+                job: job,
+                isUninterested: state.uninterestedJobIds.contains(job.jobId),
+                isBookmarked: state.bookmarkedJobs.contains(job),
+                onBookmarkTap: onBookmark == null
+                    ? null
+                    : () => onBookmark!(job),
+                onUninterestedTap: onUninterested == null
+                    ? null
+                    : () => onUninterested!(job),
+              );
+            },
+          ),
         ),
       ),
     );

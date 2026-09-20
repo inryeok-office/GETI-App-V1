@@ -46,9 +46,8 @@ class RecommendationStateContent extends StatelessWidget {
         description: '일시적인 오류가 발생했어요.\n잠시 후 다시 시도해 주세요.',
         buttonLabel: '다시 시도',
       ),
-      RecommendationStatus.loaded => throw StateError(
-        '추천 결과 상태는 RecommendationStateContent에서 표시하지 않습니다.',
-      ),
+      RecommendationStatus.loaded || RecommendationStatus.disabled =>
+        throw StateError('추천 결과 상태는 RecommendationStateContent에서 표시하지 않습니다.'),
     };
 
     final callback = switch (status) {
